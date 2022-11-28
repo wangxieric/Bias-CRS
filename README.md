@@ -1,6 +1,6 @@
-# Bias-ConvRec
+# Bias-CRS
 
-**Bias-ConvRec** is a framework that analyses the effects of various widely discussed biases from _statis recommendation_ to **conversational recommendation models**. 
+**Bias-CRS** is a framework that analyses the effects of various widely discussed biases from _statis recommendation_ to **conversational recommendation models**. 
 
 In this framework, we explore multiple recent conversational recommenders:
 
