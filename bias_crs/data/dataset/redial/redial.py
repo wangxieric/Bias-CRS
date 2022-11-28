@@ -26,8 +26,8 @@ from copy import copy
 from loguru import logger
 from tqdm import tqdm
 
-from crslab.config import DATASET_PATH
-from crslab.data.dataset.base import BaseDataset
+from bias_crs.config import DATASET_PATH
+from bias_crs.data.dataset.base import BaseDataset
 from .resources import resources
 
 

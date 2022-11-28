@@ -10,7 +10,7 @@
 import argparse
 import warnings
 
-from crslab.config import Config
+from bias_crs.config import Config
 
 warnings.filterwarnings('ignore')
 
@@ -38,7 +38,7 @@ if __name__ == '__main__':
     args, _ = parser.parse_known_args()
     config = Config(args.config, args.gpu, args.debug)
 
-    from crslab.quick_start import run_crslab
+    from bias_crs.quick_start import run_bias_crs
 
-    run_crslab(config, args.save_data, args.restore_data, args.save_system, args.restore_system, args.interact,
+    run_bias_crs(config, args.save_data, args.restore_data, args.save_system, args.restore_system, args.interact,
                args.debug, args.tensorboard)

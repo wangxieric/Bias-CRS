@@ -14,7 +14,7 @@ from abc import ABC, abstractmethod
 import numpy as np
 from loguru import logger
 
-from crslab.download import build
+from bias_crs.download import build
 
 
 class BaseDataset(ABC):
