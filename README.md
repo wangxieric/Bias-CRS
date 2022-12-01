@@ -16,6 +16,20 @@ In this framework, we explore multiple recent conversational recommenders:
 |_UniCRS_|[KDD'22](https://dl.acm.org/doi/pdf/10.1145/3534678.3539382)| [github link](https://github.com/RUCAIBox/UniCRS)||
 |_UCCR_| [SIGIR'22](https://dl.acm.org/doi/pdf/10.1145/3477495.3532074)| [github link](https://github.com/lisk123/UCCR)||
 
+**Commands to prepare the enviroment:**
+
+```
+apt-get update
+apt-get install build-essential -y
+pip install torch-scatter -f https://pytorch-geometric.com/whl/torch-${TORCH}+${CUDA}.html
+pip install torch-sparse -f https://pytorch-geometric.com/whl/torch-${TORCH}+${CUDA}.html
+pip install torch-cluster -f https://pytorch-geometric.com/whl/torch-${TORCH}+${CUDA}.html
+pip install torch-spline-conv -f https://pytorch-geometric.com/whl/torch-${TORCH}+${CUDA}.html
+pip install torch-geometric
+pip install torch==1.12.1+cu113 torchvision==0.13.1+cu113 torchaudio==0.12.1 --extra-index-url https://download.pytorch.org/whl/cu113
+pip install -r requirement.txt
+```
+
 **Recommendation Results:**
 
 _ReDial Dataset_
