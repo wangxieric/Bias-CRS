@@ -27,7 +27,7 @@ pip install torch-cluster -f https://pytorch-geometric.com/whl/torch-${TORCH}+${
 pip install torch-spline-conv -f https://pytorch-geometric.com/whl/torch-${TORCH}+${CUDA}.html
 pip install torch-geometric
 pip install torch==1.12.1+cu113 torchvision==0.13.1+cu113 torchaudio==0.12.1 --extra-index-url https://download.pytorch.org/whl/cu113
-pip install -r requirement.txt
+pip install -r requirements.txt
 ```
 
 **Recommendation Results:**
@@ -36,4 +36,5 @@ _ReDial Dataset_
 
 | Model name | Recall@1 | Recall@10| Recall@50|
 | ----------- |  ----------- | ----------- | ----------- |
+|_ReDial_|0.0| 0.03226| 0.06452|
 
