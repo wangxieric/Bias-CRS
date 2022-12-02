@@ -21,12 +21,12 @@ In this framework, we explore multiple recent conversational recommenders:
 ```
 apt-get update
 apt-get install build-essential -y
+pip install torch==1.12.0+cu113 torchvision==0.13.0+cu113 torchaudio==0.12.0 --extra-index-url https://download.pytorch.org/whl/cu113
 pip install torch-scatter -f https://pytorch-geometric.com/whl/torch-${TORCH}+${CUDA}.html
 pip install torch-sparse -f https://pytorch-geometric.com/whl/torch-${TORCH}+${CUDA}.html
 pip install torch-cluster -f https://pytorch-geometric.com/whl/torch-${TORCH}+${CUDA}.html
 pip install torch-spline-conv -f https://pytorch-geometric.com/whl/torch-${TORCH}+${CUDA}.html
 pip install torch-geometric
-pip install torch==1.12.1+cu113 torchvision==0.13.1+cu113 torchaudio==0.12.1 --extra-index-url https://download.pytorch.org/whl/cu113
 pip install -r requirements.txt
 ```
 
@@ -37,4 +37,7 @@ _ReDial Dataset_
 | Model name | Recall@1 | Recall@10| Recall@50|
 | ----------- |  ----------- | ----------- | ----------- |
 |_ReDial_|0.0| 0.03226| 0.06452|
+|_KBRD_|0.03854|0.2130|0.4249|
+
+
 
