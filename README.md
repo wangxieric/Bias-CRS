@@ -27,17 +27,17 @@ pip install torch-sparse -f https://pytorch-geometric.com/whl/torch-${TORCH}+${C
 pip install torch-cluster -f https://pytorch-geometric.com/whl/torch-${TORCH}+${CUDA}.html
 pip install torch-spline-conv -f https://pytorch-geometric.com/whl/torch-${TORCH}+${CUDA}.html
 pip install torch-geometric
+
+pip install pyg-lib torch-scatter torch-sparse torch-cluster torch-spline-conv torch-geometric -f https://data.pyg.org/whl/torch-1.12.0+cu113.html
+export LD_LIBRARY_PATH="/opt/conda/lib/:$LD_LIBRARY_PATH"
+
 pip install -r requirements.txt
 ```
 
 **Recommendation Results:**
 
-_ReDial Dataset_
+_TG-ReDial Dataset_
 
-| Model name | Recall@1 | Recall@10| Recall@50|
-| ----------- |  ----------- | ----------- | ----------- |
-|_ReDial_|0.0| 0.03226| 0.06452|
-|_KBRD_|0.03854|0.2130|0.4249|
-
-
-
+| Model name | Recall@1 | Recall@10| Recall@50| MRR@1 | MRR@10 | MRR@50| NDCG@1| NDCG@10 | NDCG@50|
+| ----------- |  ----------- | ----------- | ----------- |  ----------- |  ----------- |  ----------- |  ----------- |  ----------- |  ----------- |
+|_KBRD_|0.0049|0.0281|0.0651| 0.004902 | 0.01093 | 0.01241 | 0.004902 | 0.01494 | 0.02271 |

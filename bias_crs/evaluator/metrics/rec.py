@@ -14,8 +14,6 @@ from bias_crs.evaluator.metrics.base import AverageMetric
 class HitMetric(AverageMetric):
     @staticmethod
     def compute(ranks, label, k) -> 'HitMetric':
-        if int(label in ranks[:k]) > 0:
-            print(k, label, ranks[:k], int(label in ranks[:k]))
         return HitMetric(int(label in ranks[:k]))
 
 
