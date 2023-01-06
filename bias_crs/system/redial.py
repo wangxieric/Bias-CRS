@@ -71,7 +71,7 @@ class ReDialSystem(BaseSystem):
             r_str = ind2txt(r, self.ind2tok, self.end_token_idx)
             self.evaluator.gen_evaluate(p_str, [r_str])
 
-    def step(self, batch, stage, mode):
+    def step(self, batch, epoch, stage, mode):
         assert stage in ('rec', 'conv')
         assert mode in ('train', 'valid', 'test')
 
@@ -80,12 +80,13 @@ class ReDialSystem(BaseSystem):
                 batch[k] = v.to(self.device)
 
         if stage == 'rec':
-            rec_loss, rec_scores = self.rec_model.forward(batch, mode=mode)
+            rec_loss, rec_scores = self.rec_model.forward(batch, epoch, mode=mode)
             rec_loss = rec_loss.sum()
             if mode == 'train':
                 self.backward(rec_loss)
             else:
-                self.rec_evaluate(rec_scores, batch['item'])
+                if epoch > 3:
+                    self.rec_evaluate(rec_scores, batch['item'])
             rec_loss = rec_loss.item()
             self.evaluator.optim_metrics.add("rec_loss", AverageMetric(rec_loss))
         else:
@@ -101,7 +102,6 @@ class ReDialSystem(BaseSystem):
 
     def train_recommender(self):
         self.init_optim(self.rec_optim_opt, self.rec_model.parameters())
-
         for epoch in range(self.rec_epoch):
             self.evaluator.reset_metrics()
             logger.info(f'[Recommendation epoch {str(epoch)}]')
@@ -114,7 +114,7 @@ class ReDialSystem(BaseSystem):
             with torch.no_grad():
                 self.evaluator.reset_metrics()
                 for batch in self.valid_dataloader['rec'].get_rec_data(batch_size=self.rec_batch_size, shuffle=False):
-                    self.step(batch, stage='rec', mode='valid')
+                    self.step(batch, epoch, stage='rec', mode='valid')
                 self.evaluator.report(epoch=epoch, mode='valid')  # report valid loss
                 # early stop
                 metric = self.evaluator.optim_metrics['rec_loss']

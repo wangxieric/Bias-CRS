@@ -41,7 +41,9 @@ Model_register_table = {
     'GRU4REC': GRU4RECModel,
     'Popularity': PopularityModel,
     'TextCNN': TextCNNModel,
-    'NTRD': NTRDModel
+    'NTRD': NTRDModel,
+    # new added model
+    'RevCoreRec': RevCoreRecModel
 }
 
 

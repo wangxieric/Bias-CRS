@@ -21,6 +21,7 @@ from .kgsf import KGSFSystem
 from .redial import ReDialSystem
 from .ntrd import NTRDSystem
 from .tgredial import TGReDialSystem
+from .revcore import RevCoreSystem
 
 system_register_table = {
     'ReDialRec_ReDialConv': ReDialSystem,
@@ -41,7 +42,9 @@ system_register_table = {
     'GRU4REC': TGReDialSystem,
     'Popularity': TGReDialSystem,
     'TextCNN': TGReDialSystem,
-    'NTRD': NTRDSystem
+    'NTRD': NTRDSystem,
+    # newly added systems
+    'RevCore': RevCoreSystem
 }
 
 

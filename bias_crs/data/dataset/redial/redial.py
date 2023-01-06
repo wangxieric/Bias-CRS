@@ -30,6 +30,8 @@ from bias_crs.config import DATASET_PATH
 from bias_crs.data.dataset.base import BaseDataset
 from .resources import resources
 
+import pickle as pkl
+
 
 class ReDialDataset(BaseDataset):
     """
@@ -56,7 +58,7 @@ class ReDialDataset(BaseDataset):
 
     """
 
-    def __init__(self, opt, tokenize, restore=False, save=False):
+    def __init__(self, opt, tokenize, restore=False, save=False, model=None):
         """Specify tokenized resource and init base dataset.
 
         Args:
@@ -64,13 +66,13 @@ class ReDialDataset(BaseDataset):
             tokenize (str): how to tokenize dataset.
             restore (bool): whether to restore saved dataset which has been processed. Defaults to False.
             save (bool): whether to save dataset after processing. Defaults to False.
-
+            model (str): enable a specific loading of data for a CRS model.
         """
         resource = resources[tokenize]
         self.special_token_idx = resource['special_token_idx']
         self.unk_token_idx = self.special_token_idx['unk']
         dpath = os.path.join(DATASET_PATH, "redial", tokenize)
-        super().__init__(opt, dpath, resource, restore, save)
+        super().__init__(opt, dpath, resource, restore, save, model)
 
     def _load_data(self):
         train_data, valid_data, test_data = self._load_raw_data()
@@ -87,6 +89,7 @@ class ReDialDataset(BaseDataset):
             'n_entity': self.n_entity,
             'n_word': self.n_word,
         }
+
         vocab.update(self.special_token_idx)
 
         return train_data, valid_data, test_data, vocab
@@ -133,6 +136,36 @@ class ReDialDataset(BaseDataset):
         logger.debug(
             f"[Load word dictionary and KG from {os.path.join(self.dpath, 'concept2id.json')} and {os.path.join(self.dpath, 'conceptnet_subkg.txt')}]")
 
+        # load specific data for models
+        if self.model == 'revcore':
+            self.entity_max = len(self.entity2id)
+            self.subkg = pkl.load(open(os.path.join(self.dpath, 'revcore_data/subkg.pkl', 'rb')))
+            self.text_dict = pkl.load(open(os.path.join(self.dpath, 'revcore_data/text_dict_new.pkl', 'rb')))
+            self.reviews  = pkl.load(open(os.path.join(self.dpath, 'revcore_data/movie2tokenreview_helpful.pkl')))
+            # prepare word2vec
+            self.word2index = json.load(open(os.path.join(self.dpath, 'revcore_data/word2index_redial2.json', 
+                            encoding='utf-8')))
+            self.key2index = json.load(open(os.path.join(self.dpath, 'revcore_data/key2index_3rd.json',
+                            encoding='utf-8')))
+            self.stopwords = set([word.strip() for word in open(os.path.join(self.dpath,'stopwords.txt',
+                            encoding='utf-8'))])
+            self.full_data = self.load_full_data(os.path.join(self.dpath, 'full_raw_data/'))
+            self.corpus = []
+
+    def _load_full_data(self, data_dir):
+        # combine all the data to identify missing data from initial datasets
+        data = []
+        f = open(data_dir + 'train_data.jsonl')
+        for line in f:
+            data.append(json.loads(line))
+        f = open(data_dir + 'test_data.jsonl')
+        for line in f:
+            data.append(json.loads(line))
+        conv_dict = {}
+        for conv in data:
+            conv_dict[conv['conversationId']] = conv
+        return conv_dict
+
     def _data_preprocess(self, train_data, valid_data, test_data):
         processed_train_data = self._raw_data_process(train_data)
         logger.debug("[Finish train data process]")
@@ -145,10 +178,10 @@ class ReDialDataset(BaseDataset):
         return processed_train_data, processed_valid_data, processed_test_data, processed_side_data
 
     def _raw_data_process(self, raw_data):
-        augmented_convs = [self._merge_conv_data(conversation["dialog"]) for conversation in tqdm(raw_data)]
+        augmented_convs = {conversation['conv_id']: self._merge_conv_data(conversation["dialog"]) for conversation in tqdm(raw_data)}
         augmented_conv_dicts = []
-        for conv in tqdm(augmented_convs):
-            augmented_conv_dicts.extend(self._augment_and_add(conv))
+        for conv_id, conv in tqdm(augmented_convs.items()):
+            augmented_conv_dicts.extend(self._augment_and_add(conv_id, conv))
         return augmented_conv_dicts
 
     def _merge_conv_data(self, dialog):
@@ -177,15 +210,18 @@ class ReDialDataset(BaseDataset):
 
         return augmented_convs
 
-    def _augment_and_add(self, raw_conv_dict):
+    def _augment_and_add(self, conv_id, raw_conv_dict):
         augmented_conv_dicts = []
         context_tokens, context_entities, context_words, context_items = [], [], [], []
         entity_set, word_set = set(), set()
-        for i, conv in enumerate(raw_conv_dict):
+        contexts = self.full_data[conv_id]['messages']
+        for idx, conv in enumerate(raw_conv_dict):
+            # text is the split full words and the words are the ones that removed some stop words
             text_tokens, entities, movies, words = conv["text"], conv["entity"], conv["movie"], conv["word"]
             if len(context_tokens) > 0:
                 conv_dict = {
                     "role": conv['role'],
+                    "user": contexts[idx]['senderWorkerId'],
                     "context_tokens": copy(context_tokens),
                     "response": text_tokens,
                     "context_entities": copy(context_entities),
@@ -194,7 +230,6 @@ class ReDialDataset(BaseDataset):
                     "items": movies,
                 }
                 augmented_conv_dicts.append(conv_dict)
-
             context_tokens.append(text_tokens)
             context_items += movies
             for entity in entities + movies:
@@ -205,7 +240,8 @@ class ReDialDataset(BaseDataset):
                 if word not in word_set:
                     word_set.add(word)
                     context_words.append(word)
-
+            if self.model == 'revcore':
+                self.corpus.append(' '.join(text_tokens))
         return augmented_conv_dicts
 
     def _side_data_process(self):

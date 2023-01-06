@@ -25,7 +25,7 @@ class BaseDataset(ABC):
 
     """
 
-    def __init__(self, opt, dpath, resource, restore=False, save=False):
+    def __init__(self, opt, dpath, resource, restore=False, save=False, model=None):
         """Download resource, load, process data. Support restore and save processed dataset.
 
         Args:
@@ -34,10 +34,11 @@ class BaseDataset(ABC):
             resource (dict): version, download file and special token idx of tokenized dataset.
             restore (bool): whether to restore saved dataset which has been processed. Defaults to False.
             save (bool): whether to save dataset after processing. Defaults to False.
-
+            model (str): enable a specific loading of data for a CRS model.
         """
         self.opt = opt
         self.dpath = dpath
+        self.model = model
 
         # download
         dfile = resource['file']

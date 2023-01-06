@@ -1,0 +1,71 @@
+# dataset
+dataset: ReDial
+tokenize:
+  rec: nltk
+  # conv: nltk
+# dataloader
+scale: 1
+# model
+# rec
+rec_model: RevCoreRec
+# conv
+# conv_model: ReDialConv
+# embedding: word2vec
+embedding_dim: 300
+utterance_encoder_hidden_size: 256
+dialog_encoder_hidden_size: 256
+dialog_encoder_num_layers: 1
+use_dropout: False
+dropout: 0.3
+decoder_hidden_size: 256
+decoder_num_layers: 1
+max_c_length: 256
+max_r_length: 30
+max_count: 5
+use_cuda: true
+load_dict: None
+is_finetune: !!bool false
+embedding_type: !!str random
+gpu: 0
+# optim
+rec:
+  epoch: 50
+  batch_size: 128
+  optimizer:
+    name: Adam
+    lr: !!float 1e-3
+  momentum: !!float 0
+  early_stop: !!bool true
+  impatience: 3
+  stop_mode: min
+  n_heads: 2
+  n_layers: 2
+  ffn_sizes: 300
+  dropout: !!float 0.1
+  attention_dropout: !!float 0.0
+  relu_dropout: !!float 0.1
+  learn_positional_embeddings: !!bool false
+  # the following numbers are specified to ReDial
+  # and ReDial-variants
+  n_entity: 64368 
+  n_relation: 214
+  n_concept: 29308
+  n_con_relation: 48
+  dim: 128
+  n_hop: 2
+  kge_weight: !!float 1
+  l2_weight: !!float 2.5e-6
+  n_memory: !!float 32
+  item_update_mode: !!str 0,1
+  using_all_hops: !!bool true
+  num_bases: 8
+  # tf_log:
+# conv:
+  # epoch: 50
+  # batch_size: 128
+  # optimizer:
+  #   name: Adam
+  #   lr: !!float 1e-3
+  # early_stop: true
+  # impatience: 3
+  # stop_mode: min
