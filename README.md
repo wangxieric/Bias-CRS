@@ -21,6 +21,14 @@ In this framework, we explore multiple recent conversational recommenders:
 ```
 apt-get update
 apt-get install build-essential -y
+
+Preparing enviroment:
+(for torch 1.12.0)
+Option 1: 
+pip install pyg-lib torch-scatter torch-sparse torch-cluster torch-spline-conv torch-geometric -f https://data.pyg.org/whl/torch-1.12.0+cu113.html
+export LD_LIBRARY_PATH="/opt/conda/lib/:$LD_LIBRARY_PATH"
+
+Option 2:
 pip install torch==1.12.0+cu113 torchvision==0.13.0+cu113 torchaudio==0.12.0 --extra-index-url https://download.pytorch.org/whl/cu113
 pip install torch-scatter -f https://pytorch-geometric.com/whl/torch-${TORCH}+${CUDA}.html
 pip install torch-sparse -f https://pytorch-geometric.com/whl/torch-${TORCH}+${CUDA}.html
@@ -28,12 +36,13 @@ pip install torch-cluster -f https://pytorch-geometric.com/whl/torch-${TORCH}+${
 pip install torch-spline-conv -f https://pytorch-geometric.com/whl/torch-${TORCH}+${CUDA}.html
 pip install torch-geometric
 
-pip install pyg-lib torch-scatter torch-sparse torch-cluster torch-spline-conv torch-geometric -f https://data.pyg.org/whl/torch-1.12.0+cu113.html
-export LD_LIBRARY_PATH="/opt/conda/lib/:$LD_LIBRARY_PATH"
-
 pip install -r requirements.txt
 ```
 
+A quick test:
+```
+python run_bias_crs.py --config config/crs/tgredial/tgredial.yaml
+```
 **Recommendation Results:**
 
 _TG-ReDial Dataset_
