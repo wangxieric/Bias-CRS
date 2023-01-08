@@ -22,7 +22,7 @@ import json
 import os
 from collections import defaultdict
 from copy import copy
-
+import numpy as np
 from loguru import logger
 from tqdm import tqdm
 
@@ -219,6 +219,23 @@ class ReDialDataset(BaseDataset):
             # text is the split full words and the words are the ones that removed some stop words
             text_tokens, entities, movies, words = conv["text"], conv["entity"], conv["movie"], conv["word"]
             if len(context_tokens) > 0:
+                context,c_lengths,concept_mask, dbpedia_mask, reviews_mask,_=self.padding_context(context_tokens)
+                concept_vec=np.zeros(self.opt['n_concept'] + 1)
+                for con in concept_mask:
+                    if con!=0:
+                        concept_vec[con]=1
+                db_vec=np.zeros(self.opt['n_entity'])
+                for db in dbpedia_mask:
+                    if db!=0:
+                        db_vec[db]=1
+                entity_vec = np.zeros(self.opt['n_entity'])
+                entity_vector=np.zeros(50, dtype=np.int)
+                point = 0
+                for en in entities:
+                    entity_vec[en]=1
+                    entity_vector[point]=en
+                    point += 1
+                response,_,_,_,_ = self.padding_w2v(text_tokens, self.opt['max_r_length'])
                 conv_dict = {
                     "role": conv['role'],
                     "user": contexts[idx]['senderWorkerId'],
@@ -228,6 +245,12 @@ class ReDialDataset(BaseDataset):
                     "context_words": copy(context_words),
                     "context_items": copy(context_items),
                     "items": movies,
+                    "mask_response": response,
+                    "concept_mask": concept_mask,
+                    "concept_vec": concept_vec,
+                    "reviews_mask": reviews_mask,
+                    "db_vec": db_vec,
+                    "entity_vector": entity_vector,
                 }
                 augmented_conv_dicts.append(conv_dict)
             context_tokens.append(text_tokens)
@@ -302,3 +325,78 @@ class ReDialDataset(BaseDataset):
             'edge': list(edges),
             'entity': list(entities)
         }
+
+    def padding_context(self, contexts, pad=0, transformer=True):
+        vectors=[]
+        vec_lengths=[]
+        if transformer==False:
+            if len(contexts)>self.max_count:
+                for sen in contexts[-self.opt['max_count']:]:
+                    vec, v_l = self.padding_w2v(sen, self.opt['max_r_length'], transformer)
+                    vectors.append(vec)
+                    vec_lengths.append(v_l)
+                return vectors,vec_lengths,self.max_count
+            else:
+                length=len(contexts)
+                for sen in contexts:
+                    vec, v_l = self.padding_w2v(sen, self.opt['max_r_length'], transformer)
+                    vectors.append(vec)
+                    vec_lengths.append(v_l)
+                return vectors+(self.opt['max_count']-length) * [[pad]*self.opt['max_c_length']], vec_lengths+[0]*(self.opt['max_count']-length), length
+        else:
+            contexts_com=[]
+            for sen in contexts[-self.opt['max_count']:-1]:
+                contexts_com.extend(sen)
+                contexts_com.append('_split_')
+            contexts_com.extend(contexts[-1])
+            vec,v_l,concept_mask,dbpedia_mask,reviews_mask = self.padding_w2v(contexts_com, self.opt['max_c_length'], transformer)
+            return vec,v_l,concept_mask,dbpedia_mask,reviews_mask,0
+
+    def padding_w2v(self,sentence, max_length, transformer=True,pad=0,end=2,unk=3):
+        vector=[]
+        concept_mask=[]
+        dbpedia_mask=[]
+        reviews_mask=[]
+        for word in sentence:
+            #### vector ####
+            if '#' in word:
+                vector.append(self.word2index.get(word[1:],unk))
+            else:
+                vector.append(self.word2index.get(word,unk))
+            
+            #### concept_mask ####
+            concept_mask.append(self.key2index.get(word.lower(),0))
+            
+            #### dbpedia_mask ####
+            if '@' in word:
+                try:
+                    entity = self.id2entity[int(word[1:])]
+                    id=self.entity2id[entity]
+                except:
+                    id=self.entity_max
+                dbpedia_mask.append(id)
+            else:
+                dbpedia_mask.append(self.entity_max)
+            
+            #### review_mask ####
+            if '#' in word:
+                reviews_mask.append(1)#self.word2index.get(word[1:],unk))
+            else:
+                reviews_mask.append(0)#pad)
+                
+        vector.append(end)
+        concept_mask.append(0)
+        dbpedia_mask.append(self.entity_max)
+        reviews_mask.append(0)#pad)
+
+        if len(vector)>max_length:
+            if transformer:
+                return vector[-max_length:],max_length,concept_mask[-max_length:],dbpedia_mask[-max_length:],reviews_mask[:max_length]
+            else:
+                return vector[:max_length],max_length,concept_mask[:max_length],dbpedia_mask[:max_length],reviews_mask[:max_length]
+        else:
+            length=len(vector)
+            return vector+(max_length-len(vector))*[pad],length,\
+                   concept_mask+(max_length-len(vector))*[0],\
+                   dbpedia_mask+(max_length-len(vector))*[self.entity_max],\
+                   reviews_mask+(max_length-len(vector))*[0]
