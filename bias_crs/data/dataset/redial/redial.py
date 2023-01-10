@@ -266,8 +266,8 @@ class ReDialDataset(BaseDataset):
                 if word not in word_set:
                     word_set.add(word)
                     context_words.append(word)
-            if self.model == 'revcore':
-                self.corpus.append(' '.join(text_tokens))
+            if self.opt["rec_model"] == 'RevCoreRec':
+                self.corpus.append(' '.join(text_tokens_text))
         return augmented_conv_dicts
 
     def _side_data_process(self):
