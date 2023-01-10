@@ -183,7 +183,10 @@ class ReDialDataset(BaseDataset):
         augmented_convs = {conversation['conv_id']: self._merge_conv_data(conversation["dialog"]) for conversation in tqdm(raw_data)}
         augmented_conv_dicts = []
         for conv_id, conv in tqdm(augmented_convs.items()):
-            augmented_conv_dicts.extend(self._augment_and_add(conv_id, conv))
+            if self.opt["rec_model"] == 'RevCoreRec':
+                augmented_conv_dicts.extend(self._augment_and_add_revcore(conv_id, conv))
+            else:
+                augmented_conv_dicts.extend(self._augment_and_add_default(conv))
         return augmented_conv_dicts
 
     def _merge_conv_data(self, dialog):
@@ -212,7 +215,38 @@ class ReDialDataset(BaseDataset):
 
         return augmented_convs
 
-    def _augment_and_add(self, conv_id, raw_conv_dict):
+    def _augment_and_add_default(self, raw_conv_dict):
+        augmented_conv_dicts = []
+        context_tokens, context_entities, context_words, context_items = [], [], [], []
+        entity_set, word_set = set(), set()
+        for i, conv in enumerate(raw_conv_dict):
+            text_tokens, entities, movies, words = conv["text"], conv["entity"], conv["movie"], conv["word"]
+            if len(context_tokens) > 0:
+                conv_dict = {
+                    "role": conv['role'],
+                    "context_tokens": copy(context_tokens),
+                    "response": text_tokens,
+                    "context_entities": copy(context_entities),
+                    "context_words": copy(context_words),
+                    "context_items": copy(context_items),
+                    "items": movies,
+                }
+                augmented_conv_dicts.append(conv_dict)
+
+            context_tokens.append(text_tokens)
+            context_items += movies
+            for entity in entities + movies:
+                if entity not in entity_set:
+                    entity_set.add(entity)
+                    context_entities.append(entity)
+            for word in words:
+                if word not in word_set:
+                    word_set.add(word)
+                    context_words.append(word)
+
+        return augmented_conv_dicts
+
+    def _augment_and_add_revcore(self, conv_id, raw_conv_dict):
         augmented_conv_dicts = []
         context_tokens, context_tokens_text, context_entities, context_words, context_items = [], [], [], [], []
         entity_set, word_set = set(), set()
@@ -227,11 +261,11 @@ class ReDialDataset(BaseDataset):
                 for con in concept_mask:
                     if con!=0:
                         concept_vec[con]=1
-                db_vec=np.zeros(self.opt['n_entity'])
+                db_vec=np.zeros(self.opt['rec']['n_entity'])
                 for db in dbpedia_mask:
                     if db!=0:
                         db_vec[db]=1
-                entity_vec = np.zeros(self.opt['n_entity'])
+                entity_vec = np.zeros(self.opt['rec']['n_entity'])
                 entity_vector=np.zeros(50, dtype=np.int)
                 point = 0
                 for en in entities:
