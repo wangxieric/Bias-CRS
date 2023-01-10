@@ -26,7 +26,7 @@ import numpy as np
 from loguru import logger
 from tqdm import tqdm
 
-from bias_crs.config import DATASET_PATH
+from bias_crs.config import ROOT_PATH, DATASET_PATH
 from bias_crs.data.dataset.base import BaseDataset
 from .resources import resources
 
@@ -72,25 +72,26 @@ class ReDialDataset(BaseDataset):
         self.special_token_idx = resource['special_token_idx']
         self.unk_token_idx = self.special_token_idx['unk']
         dpath = os.path.join(DATASET_PATH, "redial", tokenize)
+        self.opt = opt
+        # load specific data for models
+        if self.opt["rec_model"] == 'RevCoreRec':
+            self.subkg = pkl.load(open(os.path.join(ROOT_PATH, "bias_crs/data/dataset/redial", 'revcore_data/subkg.pkl'), 'rb'))
+            self.text_dict = pkl.load(open(os.path.join(ROOT_PATH, "bias_crs/data/dataset/redial", 'revcore_data/text_dict_new.pkl'), 'rb'))
+            self.reviews  = pkl.load(open(os.path.join(ROOT_PATH, "bias_crs/data/dataset/redial", 'revcore_data/movie2tokenreview_helpful.pkl'), 'rb'))
+            # prepare word2vec
+            self.word2index = json.load(open(os.path.join(ROOT_PATH, "bias_crs/data/dataset/redial", 'revcore_data/word2index_redial2.json'), 
+                            encoding='utf-8'))
+            self.key2index = json.load(open(os.path.join(ROOT_PATH, "bias_crs/data/dataset/redial", 'revcore_data/key2index_3rd.json'),
+                            encoding='utf-8'))
+            self.stopwords = set([word.strip() for word in open(os.path.join(ROOT_PATH, "bias_crs/data/dataset/redial",'revcore_data/stopwords.txt'),
+                            encoding='utf-8')])
+            self.full_data = self._load_full_data(os.path.join(ROOT_PATH, "bias_crs/data/dataset/redial", 'full_raw_data/'))
+            self.corpus = []
         super().__init__(opt, dpath, resource, restore, save)
 
     def _load_data(self):
-         # load specific data for models
-        if self.opt["rec_model "] == 'RevCoreRec':
-            self.entity_max = len(self.entity2id)
-            self.subkg = pkl.load(open(os.path.join(self.dpath, 'revcore_data/subkg.pkl', 'rb')))
-            self.text_dict = pkl.load(open(os.path.join(self.dpath, 'revcore_data/text_dict_new.pkl', 'rb')))
-            self.reviews  = pkl.load(open(os.path.join(self.dpath, 'revcore_data/movie2tokenreview_helpful.pkl')))
-            # prepare word2vec
-            self.word2index = json.load(open(os.path.join(self.dpath, 'revcore_data/word2index_redial2.json', 
-                            encoding='utf-8')))
-            self.key2index = json.load(open(os.path.join(self.dpath, 'revcore_data/key2index_3rd.json',
-                            encoding='utf-8')))
-            self.stopwords = set([word.strip() for word in open(os.path.join(self.dpath,'stopwords.txt',
-                            encoding='utf-8'))])
-            self.full_data = self.load_full_data(os.path.join(self.dpath, 'full_raw_data/'))
-            self.corpus = []
-            
+         
+
         train_data, valid_data, test_data = self._load_raw_data()
         self._load_vocab()
         self._load_other_data()
@@ -212,14 +213,15 @@ class ReDialDataset(BaseDataset):
 
     def _augment_and_add(self, conv_id, raw_conv_dict):
         augmented_conv_dicts = []
-        context_tokens, context_entities, context_words, context_items = [], [], [], []
+        context_tokens, context_tokens_text, context_entities, context_words, context_items = [], [], [], [], []
         entity_set, word_set = set(), set()
         contexts = self.full_data[conv_id]['messages']
         for idx, conv in enumerate(raw_conv_dict):
             # text is the split full words and the words are the ones that removed some stop words
             text_tokens, entities, movies, words = conv["text"], conv["entity"], conv["movie"], conv["word"]
+            text_tokens_text = [self.ind2tok[text_token] for text_token in text_tokens]
             if len(context_tokens) > 0:
-                context,c_lengths,concept_mask, dbpedia_mask, reviews_mask,_=self.padding_context(context_tokens)
+                context,c_lengths,concept_mask, dbpedia_mask, reviews_mask,_=self.padding_context(context_tokens_text)
                 concept_vec=np.zeros(self.opt['n_concept'] + 1)
                 for con in concept_mask:
                     if con!=0:
@@ -235,7 +237,7 @@ class ReDialDataset(BaseDataset):
                     entity_vec[en]=1
                     entity_vector[point]=en
                     point += 1
-                response,_,_,_,_ = self.padding_w2v(text_tokens, self.opt['max_r_length'])
+                response,_,_,_,_ = self.padding_w2v(text_tokens_text, self.opt['max_r_length'])
                 conv_dict = {
                     "role": conv['role'],
                     "user": contexts[idx]['senderWorkerId'],
@@ -254,6 +256,7 @@ class ReDialDataset(BaseDataset):
                 }
                 augmented_conv_dicts.append(conv_dict)
             context_tokens.append(text_tokens)
+            context_tokens_text.append(text_tokens_text)
             context_items += movies
             for entity in entities + movies:
                 if entity not in entity_set:
@@ -330,7 +333,7 @@ class ReDialDataset(BaseDataset):
         vectors=[]
         vec_lengths=[]
         if transformer==False:
-            if len(contexts)>self.max_count:
+            if len(contexts) > self.max_count:
                 for sen in contexts[-self.opt['max_count']:]:
                     vec, v_l = self.padding_w2v(sen, self.opt['max_r_length'], transformer)
                     vectors.append(vec)
