@@ -223,7 +223,7 @@ class ReDialDataset(BaseDataset):
             text_tokens_text = [self.ind2tok[text_token] for text_token in text_tokens]
             if len(context_tokens) > 0:
                 context,c_lengths,concept_mask, dbpedia_mask, reviews_mask,_=self.padding_context(context_tokens_text)
-                concept_vec=np.zeros(self.opt['n_concept'] + 1)
+                concept_vec=np.zeros(self.opt['rec']['n_concept'] + 1)
                 for con in concept_mask:
                     if con!=0:
                         concept_vec[con]=1
