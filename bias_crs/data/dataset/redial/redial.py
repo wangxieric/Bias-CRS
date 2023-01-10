@@ -139,6 +139,7 @@ class ReDialDataset(BaseDataset):
             open(os.path.join(self.dpath, 'entity2id.json'), 'r', encoding='utf-8'))  # {entity: entity_id}
         self.id2entity = {idx: entity for entity, idx in self.entity2id.items()}
         self.n_entity = max(self.entity2id.values()) + 1
+        self.entity_max=len(self.entity2id)
         # {head_entity_id: [(relation_id, tail_entity_id)]}
         self.entity_kg = json.load(open(os.path.join(self.dpath, 'dbpedia_subkg.json'), 'r', encoding='utf-8'))
         logger.debug(
