@@ -75,6 +75,22 @@ class ReDialDataset(BaseDataset):
         super().__init__(opt, dpath, resource, restore, save)
 
     def _load_data(self):
+         # load specific data for models
+        if self.opt["rec_model "] == 'RevCoreRec':
+            self.entity_max = len(self.entity2id)
+            self.subkg = pkl.load(open(os.path.join(self.dpath, 'revcore_data/subkg.pkl', 'rb')))
+            self.text_dict = pkl.load(open(os.path.join(self.dpath, 'revcore_data/text_dict_new.pkl', 'rb')))
+            self.reviews  = pkl.load(open(os.path.join(self.dpath, 'revcore_data/movie2tokenreview_helpful.pkl')))
+            # prepare word2vec
+            self.word2index = json.load(open(os.path.join(self.dpath, 'revcore_data/word2index_redial2.json', 
+                            encoding='utf-8')))
+            self.key2index = json.load(open(os.path.join(self.dpath, 'revcore_data/key2index_3rd.json',
+                            encoding='utf-8')))
+            self.stopwords = set([word.strip() for word in open(os.path.join(self.dpath,'stopwords.txt',
+                            encoding='utf-8'))])
+            self.full_data = self.load_full_data(os.path.join(self.dpath, 'full_raw_data/'))
+            self.corpus = []
+            
         train_data, valid_data, test_data = self._load_raw_data()
         self._load_vocab()
         self._load_other_data()
@@ -135,22 +151,6 @@ class ReDialDataset(BaseDataset):
         self.word_kg = open(os.path.join(self.dpath, 'conceptnet_subkg.txt'), 'r', encoding='utf-8')
         logger.debug(
             f"[Load word dictionary and KG from {os.path.join(self.dpath, 'concept2id.json')} and {os.path.join(self.dpath, 'conceptnet_subkg.txt')}]")
-
-        # load specific data for models
-        if self.opt["rec_model "] == 'RevCoreRec':
-            self.entity_max = len(self.entity2id)
-            self.subkg = pkl.load(open(os.path.join(self.dpath, 'revcore_data/subkg.pkl', 'rb')))
-            self.text_dict = pkl.load(open(os.path.join(self.dpath, 'revcore_data/text_dict_new.pkl', 'rb')))
-            self.reviews  = pkl.load(open(os.path.join(self.dpath, 'revcore_data/movie2tokenreview_helpful.pkl')))
-            # prepare word2vec
-            self.word2index = json.load(open(os.path.join(self.dpath, 'revcore_data/word2index_redial2.json', 
-                            encoding='utf-8')))
-            self.key2index = json.load(open(os.path.join(self.dpath, 'revcore_data/key2index_3rd.json',
-                            encoding='utf-8')))
-            self.stopwords = set([word.strip() for word in open(os.path.join(self.dpath,'stopwords.txt',
-                            encoding='utf-8'))])
-            self.full_data = self.load_full_data(os.path.join(self.dpath, 'full_raw_data/'))
-            self.corpus = []
 
     def _load_full_data(self, data_dir):
         # combine all the data to identify missing data from initial datasets
