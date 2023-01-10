@@ -58,7 +58,7 @@ class ReDialDataset(BaseDataset):
 
     """
 
-    def __init__(self, opt, tokenize, restore=False, save=False, model=None):
+    def __init__(self, opt, tokenize, restore=False, save=False):
         """Specify tokenized resource and init base dataset.
 
         Args:
@@ -72,7 +72,7 @@ class ReDialDataset(BaseDataset):
         self.special_token_idx = resource['special_token_idx']
         self.unk_token_idx = self.special_token_idx['unk']
         dpath = os.path.join(DATASET_PATH, "redial", tokenize)
-        super().__init__(opt, dpath, resource, restore, save, model)
+        super().__init__(opt, dpath, resource, restore, save)
 
     def _load_data(self):
         train_data, valid_data, test_data = self._load_raw_data()
@@ -137,7 +137,7 @@ class ReDialDataset(BaseDataset):
             f"[Load word dictionary and KG from {os.path.join(self.dpath, 'concept2id.json')} and {os.path.join(self.dpath, 'conceptnet_subkg.txt')}]")
 
         # load specific data for models
-        if self.model == 'revcore':
+        if self.opt["rec_model "] == 'RevCoreRec':
             self.entity_max = len(self.entity2id)
             self.subkg = pkl.load(open(os.path.join(self.dpath, 'revcore_data/subkg.pkl', 'rb')))
             self.text_dict = pkl.load(open(os.path.join(self.dpath, 'revcore_data/text_dict_new.pkl', 'rb')))

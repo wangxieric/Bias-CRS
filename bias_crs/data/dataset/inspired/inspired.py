@@ -55,7 +55,7 @@ class InspiredDataset(BaseDataset):
 
     """
 
-    def __init__(self, opt, tokenize, restore=False, save=False, model=None):
+    def __init__(self, opt, tokenize, restore=False, save=False):
         """Specify tokenized resource and init base dataset.
 
         Args:
@@ -63,13 +63,12 @@ class InspiredDataset(BaseDataset):
             tokenize (str): how to tokenize dataset.
             restore (bool): whether to restore saved dataset which has been processed. Defaults to False.
             save (bool): whether to save dataset after processing. Defaults to False.
-            model (str): enable a specific loading of data for a CRS model.
         """
         resource = resources[tokenize]
         self.special_token_idx = resource['special_token_idx']
         self.unk_token_idx = self.special_token_idx['unk']
         dpath = os.path.join(DATASET_PATH, 'inspired', tokenize)
-        super().__init__(opt, dpath, resource, restore, save, model)
+        super().__init__(opt, dpath, resource, restore, save)
 
     def _load_data(self):
         train_data, valid_data, test_data = self._load_raw_data()

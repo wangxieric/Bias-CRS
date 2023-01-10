@@ -1,7 +1,7 @@
 import torch.nn as nn
 import json
 from bias_crs.model.base import BaseModel
-from bias_crs.model.crs.revcore import CrossModel
+from bias_crs.model.crs.revcore.cross_model import CrossModel
 
 class RevCoreRecModel(BaseModel):
     def __init__(self, opt, device, dpath=None, resource=None):
