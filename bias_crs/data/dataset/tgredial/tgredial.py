@@ -30,6 +30,8 @@ from bias_crs.config import DATASET_PATH
 from bias_crs.data.dataset.base import BaseDataset
 from .resources import resources
 
+from copy import deepcopy
+
 
 class TGReDialDataset(BaseDataset):
     """
@@ -185,6 +187,145 @@ class TGReDialDataset(BaseDataset):
         logger.debug("[Finish side data process]")
         return processed_train_data, processed_valid_data, processed_test_data, processed_side_data
 
+    def _data_preprocess_uccr(self, train_data, valid_data, test_data):
+        
+        all_datas = train_data + valid_data + test_data
+        conv_id_list = []
+        for aaa in all_datas:
+            conv_id_list.append(aaa['conv_id'])
+        import numpy as np
+        sorted_id = np.array(conv_id_list).argsort()
+        sorted_all_data = []
+        for iid in sorted_id:
+            sorted_all_data.append(all_datas[iid])
+
+        processed_train_data = []
+        processed_valid_data = []
+        processed_test_data = []
+        
+        augmented_all_convs = [self._convert_to_id(conversation) for conversation in tqdm(sorted_all_data)]
+        
+        last_user = None
+        last_user_mentioned_words_list = []
+        last_user_mentioned_entities_list = []
+        
+        conv_id_2_real_conv = dict()
+        current_user_interactions = []
+        time_id = 0
+        is_new_begin = 0
+        
+        for i in tqdm(range(len(sorted_all_data))):
+            current_user = sorted_all_data[i]['user_id']
+            current_conv = augmented_all_convs[i]
+            current_conv_id = sorted_all_data[i]['conv_id']
+            cur_aug_and_add_conv = self._augment_and_add(current_conv)
+            current_conv_interaction = dict()
+            if last_user:
+                if last_user == current_user:
+                    time_id += 1
+                    assert last_user_mentioned_words_list != []
+                    assert last_user_mentioned_entities_list != []
+                    tmp1 = cur_aug_and_add_conv[-1]['context_entities']
+                    tmp2 = cur_aug_and_add_conv[-1]['context_words']
+                    for xx in cur_aug_and_add_conv:
+                        #if xx['items'] != [] and xx['role'] == 'Recommender':
+                        yyy = deepcopy(current_user_interactions)
+                        xx['histories'] = yyy
+                        #xx['context_entities'] = last_user_mentioned_entities_list[-1] + xx['context_entities']
+                        #xx['context_words'] = last_user_mentioned_words_list[-1] + xx['context_words']
+                else:
+                    time_id = 0
+                    last_user_mentioned_words_list = []
+                    last_user_mentioned_entities_list = []
+                    current_user_interactions = []
+                    for xx in cur_aug_and_add_conv:
+                        #if xx['items'] != [] and xx['role'] == 'Recommender':
+                        yyy = deepcopy(current_user_interactions)
+                        xx['histories'] = yyy
+                    is_new_begin = 1
+            else:
+                assert current_user_interactions == []
+                for xx in cur_aug_and_add_conv:
+                    #if xx['items'] != [] and xx['role'] == 'Recommender':
+                    yyy = deepcopy(current_user_interactions)
+                    xx['histories'] = yyy
+            
+            for xx in cur_aug_and_add_conv:
+                xx['time_id'] = time_id
+                xx['user_id'] = int(current_user)
+                if xx['items'] != [] and xx['role'] == 'Recommender':
+                    if current_conv_interaction == dict():
+                        current_conv_interaction['history_entity'] = []
+                        current_conv_interaction['history_entities_pos'] = []
+                        current_conv_interaction['history_word'] = []
+                        current_conv_interaction['history_words_pos'] = []
+                        current_conv_interaction['history_item'] = []
+                    else:
+                        current_conv_interaction['history_entity'].append(xx['context_entities'])
+                        current_conv_interaction['history_entities_pos'].append(xx['context_entities_pos'])
+                        current_conv_interaction['history_word'].append(xx['context_words'])
+                        current_conv_interaction['history_words_pos'].append(xx['context_words_pos'])
+                        current_conv_interaction['history_item'].append(xx['items'])
+            if is_new_begin:
+                is_new_begin=0
+                current_user_interactions.append(current_conv_interaction)
+            else:
+                current_user_interactions.append(current_conv_interaction)
+            
+            conv_id_2_real_conv[current_conv_id] = cur_aug_and_add_conv
+            
+            if last_user and last_user == current_user:
+                last_user_mentioned_words_list.append(tmp2)
+                last_user_mentioned_entities_list.append(tmp1)
+            else:
+                last_user_mentioned_words_list.append(cur_aug_and_add_conv[-1]['context_words'])
+                last_user_mentioned_entities_list.append(cur_aug_and_add_conv[-1]['context_entities'])
+            
+            last_user = current_user
+        
+        for tr in train_data:
+            c_id = tr['conv_id']
+            processed_train_data.extend(conv_id_2_real_conv[c_id])
+        for va in valid_data:
+            c_id = va['conv_id']
+            processed_valid_data.extend(conv_id_2_real_conv[c_id])
+        for te in test_data:
+            c_id = te['conv_id']
+            processed_test_data.extend(conv_id_2_real_conv[c_id])
+        
+        # check:
+        processed_train_data_duizhao = self._raw_data_process(train_data)
+        processed_valid_data_duizhao = self._raw_data_process(valid_data)
+        processed_test_data_duizhao = self._raw_data_process(test_data)
+        
+        responses_ids_ptr = []
+        responses_ids_duizhao_ptr = []
+        for ptr in tqdm(processed_train_data):
+            responses_ids_ptr.append(tuple(ptr['response']))
+        for ptr_d in tqdm(processed_train_data_duizhao):
+            responses_ids_duizhao_ptr.append(tuple(ptr_d['response']))
+        assert set(responses_ids_ptr) == set(responses_ids_duizhao_ptr)
+        
+        responses_ids_ptr = []
+        responses_ids_duizhao_ptr = []
+        for ptr in tqdm(processed_valid_data):
+            responses_ids_ptr.append(tuple(ptr['response']))
+        for ptr_d in tqdm(processed_valid_data_duizhao):
+            responses_ids_duizhao_ptr.append(tuple(ptr_d['response']))
+        assert set(responses_ids_ptr) == set(responses_ids_duizhao_ptr)
+        
+        responses_ids_ptr = []
+        responses_ids_duizhao_ptr = []
+        for ptr in tqdm(processed_test_data):
+            responses_ids_ptr.append(tuple(ptr['response']))
+        for ptr_d in tqdm(processed_test_data_duizhao):
+            responses_ids_duizhao_ptr.append(tuple(ptr_d['response']))
+        assert set(responses_ids_ptr) == set(responses_ids_duizhao_ptr)
+        
+        processed_side_data = self._side_data_process()
+        logger.debug("[Finish side data process]")
+        return processed_train_data, processed_valid_data, processed_test_data, processed_side_data
+
     def _raw_data_process(self, raw_data):
         augmented_convs = [self._convert_to_id(conversation) for conversation in tqdm(raw_data)]
         augmented_conv_dicts = []
@@ -241,6 +382,7 @@ class TGReDialDataset(BaseDataset):
     def _augment_and_add(self, raw_conv_dict):
         augmented_conv_dicts = []
         context_tokens, context_entities, context_words, context_policy, context_items = [], [], [], [], []
+        context_entities_pos, context_words_pos = [], []
         entity_set, word_set = set(), set()
         for i, conv in enumerate(raw_conv_dict):
             text_tokens, entities, movies, words, policies = conv["text"], conv["entity"], conv["movie"], conv["word"], \
@@ -256,7 +398,9 @@ class TGReDialDataset(BaseDataset):
                     "context_tokens": copy(context_tokens),
                     "response": text_tokens,
                     "context_entities": copy(context_entities),
+                    "context_entities_pos": copy(context_entities_pos),
                     "context_words": copy(context_words),
+                    "context_words_pos": copy(context_words_pos),
                     'interaction_history': conv['interaction_history'],
                     'context_items': copy(context_items),
                     "items": movies,
@@ -273,10 +417,12 @@ class TGReDialDataset(BaseDataset):
                 if entity not in entity_set:
                     entity_set.add(entity)
                     context_entities.append(entity)
+                    context_entities_pos.append(i)
             for word in words:
                 if word not in word_set:
                     word_set.add(word)
                     context_words.append(word)
+                    context_words_pos.append(i)
 
         return augmented_conv_dicts
 

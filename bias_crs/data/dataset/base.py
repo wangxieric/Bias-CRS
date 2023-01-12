@@ -46,10 +46,15 @@ class BaseDataset(ABC):
             # load and process
             train_data, valid_data, test_data, self.vocab = self._load_data()
             logger.info('[Finish data load]')
-            self.train_data, self.valid_data, self.test_data, self.side_data = self._data_preprocess(train_data,
+            if self.opt['model'] == 'UCCR':
+                self.train_data, self.valid_data, self.test_data, self.side_data = self._data_preprocess_uccr(train_data,
                                                                                                      valid_data,
                                                                                                      test_data)
-            embedding = opt.get('embedding', None)
+            else:                                                                                         
+                self.train_data, self.valid_data, self.test_data, self.side_data = self._data_preprocess(train_data,
+                                                                                                        valid_data,
+                                                                                                        test_data)
+                embedding = opt.get('embedding', None)
             if embedding:
                 self.side_data["embedding"] = np.load(os.path.join(self.dpath, embedding))
                 logger.debug(f'[Load pretrained embedding {embedding}]')
@@ -131,6 +136,13 @@ class BaseDataset(ABC):
                     'item_entity_ids' (list of int): entity id of each item;
                 }
 
+        """
+        pass
+
+    @abstractmethod
+    def _data_preprocess_uccr(self, train_data, valid_data, test_data):
+        """Process raw train, valid, test data for the UCCR model
+        
         """
         pass
 
