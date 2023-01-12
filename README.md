@@ -14,7 +14,7 @@ In this framework, we explore multiple recent conversational recommenders:
 |_MESE_| [NAACL Findings'22](https://aclanthology.org/2022.findings-naacl.4.pdf)| [github link](https://github.com/by2299/MESE)||
 |_C<sup>2</sup>-CRS_|[WSDM'22](https://dl.acm.org/doi/pdf/10.1145/3488560.3498514)| [github link](https://github.com/Zyh716/WSDM2022-C2CRS)||
 |_UniCRS_|[KDD'22](https://dl.acm.org/doi/pdf/10.1145/3534678.3539382)| [github link](https://github.com/RUCAIBox/UniCRS)||
-|_UCCR_| [SIGIR'22](https://dl.acm.org/doi/pdf/10.1145/3477495.3532074)| [github link](https://github.com/lisk123/UCCR)||
+|_UCCR_| [SIGIR'22](https://dl.acm.org/doi/pdf/10.1145/3477495.3532074)| [github link](https://github.com/lisk123/UCCR)|:heavy_check_mark:|
 
 **Commands to prepare the enviroment:**
 
