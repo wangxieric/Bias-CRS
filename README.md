@@ -16,7 +16,7 @@ In this framework, we explore multiple recent conversational recommenders:
 |_UniCRS_|[KDD'22](https://dl.acm.org/doi/pdf/10.1145/3534678.3539382)| [github link](https://github.com/RUCAIBox/UniCRS)||
 |_UCCR_| [SIGIR'22](https://dl.acm.org/doi/pdf/10.1145/3477495.3532074)| [github link](https://github.com/lisk123/UCCR)|:heavy_check_mark:|
 
-**Commands to prepare the enviroment:**
+## Commands to prepare the enviroment
 
 ```
 apt-get update
@@ -43,7 +43,7 @@ A quick test:
 ```
 python run_bias_crs.py --config config/crs/tgredial/tgredial.yaml
 ```
-**Recommendation Results:**
+## Recommendation Results
 
 _TG-ReDial Dataset_
 
