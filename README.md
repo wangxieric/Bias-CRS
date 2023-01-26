@@ -39,7 +39,7 @@ pip install torch-geometric
 pip install -r requirements.txt
 ```
 
-A quick test:
+## A Quick Test
 ```
 python run_bias_crs.py --config config/crs/tgredial/tgredial.yaml
 ```
