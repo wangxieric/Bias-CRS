@@ -16,7 +16,7 @@ In this framework, we explore multiple recent conversational recommenders:
 |_UniCRS_|[KDD'22](https://dl.acm.org/doi/pdf/10.1145/3534678.3539382)| [github link](https://github.com/RUCAIBox/UniCRS)||
 |_UCCR_| [SIGIR'22](https://dl.acm.org/doi/pdf/10.1145/3477495.3532074)| [github link](https://github.com/lisk123/UCCR)|:heavy_check_mark:|
 
-**Commands to prepare the enviroment:**
+## Commands to prepare the enviroment
 
 ```
 apt-get update
@@ -39,13 +39,13 @@ pip install torch-geometric
 pip install -r requirements.txt
 ```
 
-A quick test:
+## A Quick Test
 ```
 python run_bias_crs.py --config config/crs/tgredial/tgredial.yaml
 ```
-**Recommendation Results:**
+## Recommendation Results
 
-_TG-ReDial Dataset_
+### TG-ReDial Dataset
 
 | Model name | Recall@1 | Recall@10| Recall@50| MRR@1 | MRR@10 | MRR@50| NDCG@1| NDCG@10 | NDCG@50|
 | ----------- |  ----------- | ----------- | ----------- |  ----------- |  ----------- |  ----------- |  ----------- |  ----------- |  ----------- |
