@@ -1,4 +1,4 @@
-# @Time   : 2020/11/22
+ # @Time   : 2020/11/22
 # @Author : Kun Zhou
 # @Email  : francis_kun_zhou@163.com
 
@@ -54,7 +54,7 @@ class BaseDataset(ABC):
                 self.train_data, self.valid_data, self.test_data, self.side_data = self._data_preprocess(train_data,
                                                                                                         valid_data,
                                                                                                         test_data)
-                embedding = opt.get('embedding', None)
+            embedding = opt.get('embedding', None)
             if embedding:
                 self.side_data["embedding"] = np.load(os.path.join(self.dpath, embedding))
                 logger.debug(f'[Load pretrained embedding {embedding}]')
@@ -138,7 +138,7 @@ class BaseDataset(ABC):
 
         """
         pass
-
+    
     @abstractmethod
     def _data_preprocess_uccr(self, train_data, valid_data, test_data):
         """Process raw train, valid, test data for the UCCR model

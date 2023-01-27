@@ -5,4 +5,5 @@ from .redial import *
 from .tgredial import *
 from .ntrd import *
 # newly added model
-from .revcore import *
+from .revcore import * 
+from .uccr import *

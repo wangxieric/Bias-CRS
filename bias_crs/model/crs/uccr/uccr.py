@@ -7,11 +7,11 @@ from loguru import logger
 from torch import nn
 from torch_geometric.nn import GCNConv, RGCNConv
 
-from crslab.config import MODEL_PATH
-from crslab.model.base import BaseModel
-from crslab.model.utils.functions import edge_to_pyg_format
-from crslab.model.utils.modules.attention import SelfAttentionSeq
-from crslab.model.utils.modules.transformer import TransformerEncoder
+from bias_crs.config import MODEL_PATH
+from bias_crs.model.base import BaseModel
+from bias_crs.model.utils.functions import edge_to_pyg_format
+from bias_crs.model.utils.modules.attention import SelfAttentionSeq
+from bias_crs.model.utils.modules.transformer import TransformerEncoder
 from .modules import GateLayer, TransformerDecoderKG, GateLayer_4_eles, GateLayer_5_eles, GateLayer_3_eles
 from .resources import resources
 

@@ -3,7 +3,7 @@ import torch
 from torch import nn as nn
 import torch.nn.functional as F
 
-from crslab.model.utils.modules.transformer import MultiHeadAttention, TransformerFFN, _create_selfattn_mask, \
+from bias_crs.model.utils.modules.transformer import MultiHeadAttention, TransformerFFN, _create_selfattn_mask, \
     _normalize, \
     create_position_codes
 

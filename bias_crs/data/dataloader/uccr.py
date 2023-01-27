@@ -8,12 +8,14 @@
 # @Email  : francis_kun_zhou@163.com, wxl1999@foxmail.com
 
 from copy import deepcopy
-
+import random
 import torch
 from tqdm import tqdm
-
-from crslab.data.dataloader.base import BaseDataLoader
-from crslab.data.dataloader.utils import add_start_end_token_idx, padded_tensor, get_onehot, truncate, merge_utt
+from loguru import logger
+from math import ceil
+import numpy as np
+from bias_crs.data.dataloader.base import BaseDataLoader
+from bias_crs.data.dataloader.utils import add_start_end_token_idx, padded_tensor, get_onehot, truncate, merge_utt
 
 
 class UCCRDataLoader(BaseDataLoader):
@@ -62,7 +64,48 @@ class UCCRDataLoader(BaseDataLoader):
         self.response_truncate = opt.get('response_truncate', None)
         self.entity_truncate = opt.get('entity_truncate', None)
         self.word_truncate = opt.get('word_truncate', None)
+    
+    def get_data(self, batch_fn, batch_size, shuffle=True, process_fn=None):
+        """Collate batch data for system to fit
+        Args:
+            batch_fn (func): function to collate data
+            batch_size (int):
+            shuffle (bool, optional): Defaults to True.
+            process_fn (func, optional): function to process dataset before batchify. Defaults to None.
+        Yields:
+            tuple or dict of torch.Tensor: batch data for system to fit
+        """
+        dataset = self.dataset
+        if process_fn is not None:
+            dataset = process_fn()
+            logger.info('[Finish dataset process before batchify]')
+        dataset = dataset[:ceil(len(dataset) * self.scale)]
+        logger.debug(f'[Dataset size: {len(dataset)}]')
 
+        batch_num = ceil(len(dataset) / batch_size)
+        idx_list = list(range(len(dataset)))
+        if shuffle:
+            random.shuffle(idx_list)
+
+        for start_idx in tqdm(range(batch_num)):
+            batch_idx = idx_list[start_idx * batch_size: (start_idx + 1) * batch_size]
+            batch = [dataset[idx] for idx in batch_idx]
+            
+            neg_idx_list = self.neg_idx(start_idx, batch_num)
+            neg_batch_idx = [idx_list[x * batch_size: (x + 1) * batch_size] for x in neg_idx_list]
+            neg_batches = [[dataset[y] for y in x] for x in neg_batch_idx]
+            yield batch_fn(batch, neg_batches)
+    
+    def neg_idx(self, start_idx, batch_num, neg_samples=5):
+        try:
+            neg_idx = np.random.randint(0, batch_num-2, size=neg_samples)
+        except:
+            neg_idx = np.random.randint(0,1,size=5)
+        if start_idx in neg_idx:
+            neg_idx = [(x+1)%(batch_num-2) for x in neg_idx]
+        return neg_idx
+    
+    
     def get_pretrain_data(self, batch_size, shuffle=True):
         return self.get_data(self.pretrain_batchify, batch_size, shuffle, self.retain_recommender_target)
 

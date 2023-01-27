@@ -22,6 +22,7 @@ from .redial import ReDialSystem
 from .ntrd import NTRDSystem
 from .tgredial import TGReDialSystem
 from .revcore import RevCoreSystem
+from .uccr import UCCRSystem
 
 system_register_table = {
     'ReDialRec_ReDialConv': ReDialSystem,
@@ -44,7 +45,8 @@ system_register_table = {
     'TextCNN': TGReDialSystem,
     'NTRD': NTRDSystem,
     # newly added systems
-    'RevCore': RevCoreSystem
+    'RevCore': RevCoreSystem,
+    'UCCR': UCCRSystem
 }
 
 

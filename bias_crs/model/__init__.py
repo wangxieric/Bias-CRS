@@ -43,7 +43,8 @@ Model_register_table = {
     'TextCNN': TextCNNModel,
     'NTRD': NTRDModel,
     # new added model
-    'RevCoreRec': RevCoreRecModel
+    'RevCoreRec': RevCoreRecModel,
+    'UCCR': UCCRModel
 }
 
 

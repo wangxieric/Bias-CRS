@@ -8,7 +8,7 @@
 # @Author  :   Xiaolei Wang
 # @email   :   wxl1999@foxmail.com
 
-from crslab.download import DownloadableFile
+from bias_crs.download import DownloadableFile
 
 resources = {
     'ReDial': {

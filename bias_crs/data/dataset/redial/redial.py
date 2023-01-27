@@ -266,7 +266,7 @@ class ReDialDataset(BaseDataset):
                     if db!=0:
                         db_vec[db]=1
                 entity_vec = np.zeros(self.opt['rec']['n_entity'])
-                entity_vector=np.zeros(50, dtype=np.int)
+                entity_vector=np.zeros(50, dtype=int)
                 point = 0
                 for en in entities:
                     entity_vec[en]=1
