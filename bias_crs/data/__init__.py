@@ -92,7 +92,7 @@ def get_dataset(opt, tokenize, restore, save) -> BaseDataset:
         raise NotImplementedError(f'The dataloader [{dataset}] has not been implemented')
 
 
-def get_dataloader(opt, dataset, vocab, side_data: None) -> BaseDataLoader:
+def get_dataloader(subset=None, opt=None, dataset=None, vocab=None, side_data=None) -> BaseDataLoader:
     """get dataloader to batchify dataset
 
     Args:
@@ -106,25 +106,9 @@ def get_dataloader(opt, dataset, vocab, side_data: None) -> BaseDataLoader:
     """
     model_name = opt['model_name']
     if model_name in dataloader_register_table:
-        return dataloader_register_table[model_name](opt, dataset, vocab)
-    else:
-        raise NotImplementedError(f'The dataloader [{model_name}] has not been implemented')
-
-# C2CRS - Overloading Method fo get_dataloader
-def get_dataloader(subset, opt, dataset, vocab, side_data) -> BaseDataLoader:
-    """get dataloader to batchify dataset
-
-    Args:
-        opt (Config or dict): config for dataloader or the whole system.
-        dataset: processed raw data, no side data.
-        vocab (dict): all kinds of useful size, idx and map between token and idx.
-
-    Returns:
-        dataloader
-
-    """
-    model_name = opt['model_name']
-    if model_name in dataloader_register_table:
-        return dataloader_register_table[model_name](subset, opt, dataset, vocab, side_data)
+        if model_name == 'C2CRS':
+            return dataloader_register_table[model_name](subset, opt, dataset, vocab, side_data)
+        else:
+            return dataloader_register_table[model_name](opt, dataset, vocab)
     else:
         raise NotImplementedError(f'The dataloader [{model_name}] has not been implemented')

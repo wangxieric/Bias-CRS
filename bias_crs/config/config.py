@@ -64,12 +64,11 @@ class Config:
             model_name = '_'.join(models)
         self.opt['model_name'] = model_name
         # C2CRS Codes
-        if model_name == 'c2crs':
+        if model_name == 'C2CRS':
             # self.single_model_name = model_name.split('Multi')[-1].split('Cross')[-1]  # Bert or others
             self.single_model_name = 'BERT' if 'BERT' in self.model_name else self.model_name  # Bert or others
             self.log_prefix = self.single_model_name + '_{}'
             logger.info('[CONFIG] {}, {}'.format(self.model_name, self.single_model_name))
-
 
             # update opt
             self.time_stamp = str(time.strftime("%Y-%m-%d-%H-%M-%S", time.localtime()))
