@@ -63,6 +63,30 @@ class Config:
                 models.append(policy_model)
             model_name = '_'.join(models)
         self.opt['model_name'] = model_name
+        # C2CRS Codes
+        if model_name == 'c2crs':
+            # self.single_model_name = model_name.split('Multi')[-1].split('Cross')[-1]  # Bert or others
+            self.single_model_name = 'BERT' if 'BERT' in self.model_name else self.model_name  # Bert or others
+            self.log_prefix = self.single_model_name + '_{}'
+            logger.info('[CONFIG] {}, {}'.format(self.model_name, self.single_model_name))
+
+
+            # update opt
+            self.time_stamp = str(time.strftime("%Y-%m-%d-%H-%M-%S", time.localtime()))
+
+            add_dict = {
+                'model_name': model_name,
+                'single_model_name': self.single_model_name,
+                'log_prefix': self.log_prefix if 'Multi' in model_name else self.log_prefix.format(0),
+                'dataset_name': dataset,
+                'gpu': gpu,
+                'time_stamp': self.time_stamp,
+            }
+            add_dict.update(vars(args))
+            self.update_opt(add_dict)
+
+            self.build_path()
+
         # log
         log_name = self.opt.get("log_name", dataset + '_' + model_name + '_' + time.strftime("%Y-%m-%d-%H-%M-%S",
                                                                                              time.localtime())) + ".log"
@@ -73,6 +97,7 @@ class Config:
             level = 'DEBUG'
         else:
             level = 'INFO'
+
         logger.add(os.path.join("log", log_name), level=level)
         logger.add(lambda msg: tqdm.write(msg, end=''), colorize=True, level=level)
 
