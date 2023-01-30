@@ -18,11 +18,14 @@ References:
 
 """
 
+import torch
+import numpy as np
 import json
+import pickle
+import random
 import os
 from collections import defaultdict
 from copy import copy
-import numpy as np
 from loguru import logger
 from tqdm import tqdm
 
@@ -407,8 +410,17 @@ class TGReDialDataset(BaseDataset):
                     'context_policy': copy(context_policy),
                     'target': policies,
                     'final': conv['final'],
+                    "entities_mask_in_context": copy(entities_mask_in_contexts),
+                    "entity_masks_in_context": copy(entity_masks_in_contexts),
+                    "entity_ids_in_context": copy(entity_ids_in_contexts),
                 }
                 augmented_conv_dicts.append(conv_dict)
+
+            entities_mask_in_contexts.append(entities_mask_in_context)  # [n_utter, utter_len]
+            # entity_masks_in_context = [n_entities_in_utter_text, utter_len]
+            padded_entity_masks_in_context = self.padd_entity_masks_in_context(pad_utters, entity_masks_in_context) # [n_entities_in_utter_text, n_utter, utter_len]
+            entity_masks_in_contexts.extend(padded_entity_masks_in_context) # [n_entities_in_context_text, n_utter, utter_len]
+            entity_ids_in_contexts.extend(entity_ids_in_context)  # [n_entities_in_context_text]
 
             context_tokens.append(text_tokens)
             context_policy.append(policies)
@@ -423,14 +435,28 @@ class TGReDialDataset(BaseDataset):
                     word_set.add(word)
                     context_words.append(word)
                     context_words_pos.append(i)
+            pad_utters.append([0]*len(text_tokens))
 
         return augmented_conv_dicts
+
+    def padd_entity_masks_in_context(self, pad_utters, entity_masks_in_context):
+        # pad_utters = [n_utter, utter_len]
+        # entity_masks_in_context = [n_entities_in_utter_text, utter_len]
+        padded_entity_masks_in_context = []
+        for entity_mask_in_context in entity_masks_in_context:
+            # entity_mask_in_context = [utter_len]
+            entity_mask_in_context = pad_utters + [entity_mask_in_context] # [n_utter, utter_len]
+            padded_entity_masks_in_context.append(entity_mask_in_context)
+
+        return padded_entity_masks_in_context # [n_entities_in_utter_text, n_utter, utter_len]
 
     def _side_data_process(self):
         processed_entity_kg = self._entity_kg_process()
         logger.debug("[Finish entity KG process]")
+
         processed_word_kg = self._word_kg_process()
         logger.debug("[Finish word KG process]")
+
         movie_entity_ids = json.load(open(os.path.join(self.dpath, 'movie_ids.json'), 'r', encoding='utf-8'))
         logger.debug('[Load movie entity ids]')
 
@@ -438,11 +464,17 @@ class TGReDialDataset(BaseDataset):
             "entity_kg": processed_entity_kg,
             "word_kg": processed_word_kg,
             "item_entity_ids": movie_entity_ids,
+            'decoder_token_prob_weight': self.decoder_token_prob_weight
         }
+
         return side_data
 
     def _entity_kg_process(self):
+        def filte_entity(entity):
+            return entity.strip('<a>').strip('</').strip()
+
         edge_list = []  # [(entity, entity, relation)]
+        entity2neighbor = defaultdict(list)  # {entityId: List[entity]}
         for line in self.entity_kg:
             triple = line.strip().split('\t')
             e0 = self.entity2id[triple[0]]
@@ -464,10 +496,15 @@ class TGReDialDataset(BaseDataset):
             entities.add(self.id2entity[h])
             entities.add(self.id2entity[t])
 
+        entity2neighbor[h].append(t)
+
         return {
+            'n_entity': self.n_entity,
             'edge': list(edges),
             'n_relation': len(relation2id),
-            'entity': list(entities)
+            'entity': list(entities),
+            'entity2neighbor': dict(entity2neighbor),
+            'id2entity': {idx: filte_entity(entity) for idx, entity in self.id2entity.items() if entity!='None'}
         }
 
     def _word_kg_process(self):
@@ -484,5 +521,6 @@ class TGReDialDataset(BaseDataset):
         # edge_set = [[co[0] for co in list(edges)], [co[1] for co in list(edges)]]
         return {
             'edge': list(edges),
-            'entity': list(entities)
+            'entity': list(entities),
+            'n_entity': self.n_word
         }

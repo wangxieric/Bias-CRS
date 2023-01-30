@@ -61,7 +61,6 @@ class BaseDataLoader(ABC):
         for start_idx in tqdm(range(batch_num)):
             batch_idx = idx_list[start_idx * batch_size: (start_idx + 1) * batch_size]
             batch = [dataset[idx] for idx in batch_idx]
-
             batch_fn_batch = batch_fn(batch)
             origin_batch = batch
             yield [batch_fn_batch, origin_batch]
@@ -113,7 +112,6 @@ class BaseDataLoader(ABC):
 
         Yields:
             tuple or dict of torch.Tensor: batch data for recommendation.
-
         """
         return self.get_data(self.rec_batchify, batch_size, shuffle, self.rec_process_fn)
     

@@ -78,7 +78,6 @@ class ReDialDataset(BaseDataset):
         resource = resources[tokenize]
         self.special_token_idx = resource['special_token_idx']
         self.unk_token_idx = self.special_token_idx['unk']
-
         dpath = os.path.join(DATASET_PATH, "redial", tokenize)
         super().__init__(opt, dpath, resource, restore, save)
 
@@ -142,7 +141,7 @@ class ReDialDataset(BaseDataset):
         self.word_kg = open(os.path.join(self.dpath, 'conceptnet_subkg.txt'), 'r', encoding='utf-8')
         logger.debug(
             f"[Load word dictionary and KG from {os.path.join(self.dpath, 'concept2id.json')} and {os.path.join(self.dpath, 'conceptnet_subkg.txt')}]")
-        
+
         filepath = os.path.join(self.dpath, 'redial_context_movie_id2crslab_entityId.json')
         self.redial_context_movie_id2crslab_entityId = json.load(open(filepath))
 
@@ -150,7 +149,7 @@ class ReDialDataset(BaseDataset):
         filepath = os.path.join(self.dpath, 'conv_tokID2freq.json')
         conv_tokID2freq = dict(json.load(open(filepath)))
         self.decoder_token_prob_weight = self.get_decoder_decoder_token_prob_weight(conv_tokID2freq)
-    
+
     def get_decoder_decoder_token_prob_weight(self, conv_tokID2freq):
         decoder_token_prob_weight = []
         nb_reform = 0
@@ -185,7 +184,7 @@ class ReDialDataset(BaseDataset):
         for conv in tqdm(augmented_convs):
             augmented_conv_dicts.extend(self._augment_and_add(conv))
         return augmented_conv_dicts
-    
+
     def _merge_conv_data_default(self, dialog):
         augmented_convs = []
         last_role = None
@@ -323,7 +322,7 @@ class ReDialDataset(BaseDataset):
             pad_utters.append([0]*len(text_tokens))
 
         return augmented_conv_dicts
-    
+
     def padd_entity_masks_in_context(self, pad_utters, entity_masks_in_context):
         # pad_utters = [n_utter, utter_len]
         # entity_masks_in_context = [n_entities_in_utter_text, utter_len]
@@ -361,7 +360,6 @@ class ReDialDataset(BaseDataset):
                     "items": movies,
                 }
                 augmented_conv_dicts.append(conv_dict)
-
             context_tokens.append(text_tokens)
             context_items += movies
             for entity in entities + movies:
@@ -372,16 +370,13 @@ class ReDialDataset(BaseDataset):
                 if word not in word_set:
                     word_set.add(word)
                     context_words.append(word)
-
         return augmented_conv_dicts
 
     def _side_data_process(self):
         processed_entity_kg = self._entity_kg_process()
         logger.debug("[Finish entity KG process]")
-
         processed_word_kg = self._word_kg_process()
         logger.debug("[Finish word KG process]")
-        
         movie_entity_ids = json.load(open(os.path.join(self.dpath, 'movie_ids.json'), 'r', encoding='utf-8'))
         logger.debug('[Load movie entity ids]')
 
@@ -391,7 +386,7 @@ class ReDialDataset(BaseDataset):
             "item_entity_ids": movie_entity_ids,
             'decoder_token_prob_weight': self.decoder_token_prob_weight
         }
-        
+
         return side_data
 
     def _entity_kg_process(self, SELF_LOOP_ID=185):
@@ -424,7 +419,7 @@ class ReDialDataset(BaseDataset):
                 edges.add((h, t, relation2id[r]))
                 entities.add(self.id2entity[h])
                 entities.add(self.id2entity[t])
-            entity2neighbor[h].append(t) 
+            entity2neighbor[h].append(t)
 
         return {
             'n_entity': self.n_entity,

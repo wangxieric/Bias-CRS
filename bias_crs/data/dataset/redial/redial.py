@@ -19,12 +19,15 @@ References:
 """
 
 import json
+import torch
 import os
-from collections import defaultdict
-from copy import copy
+import pickle
 import numpy as np
-from loguru import logger
+from copy import copy
 from tqdm import tqdm
+from loguru import logger
+from collections import defaultdict
+import ipdb
 
 from bias_crs.config import ROOT_PATH, DATASET_PATH
 from bias_crs.data.dataset.base import BaseDataset
@@ -90,8 +93,6 @@ class ReDialDataset(BaseDataset):
         super().__init__(opt, dpath, resource, restore, save)
 
     def _load_data(self):
-         
-
         train_data, valid_data, test_data = self._load_raw_data()
         self._load_vocab()
         self._load_other_data()
@@ -106,7 +107,6 @@ class ReDialDataset(BaseDataset):
             'n_entity': self.n_entity,
             'n_word': self.n_word,
         }
-
         vocab.update(self.special_token_idx)
 
         return train_data, valid_data, test_data, vocab
@@ -154,6 +154,31 @@ class ReDialDataset(BaseDataset):
         logger.debug(
             f"[Load word dictionary and KG from {os.path.join(self.dpath, 'concept2id.json')} and {os.path.join(self.dpath, 'conceptnet_subkg.txt')}]")
 
+        filepath = os.path.join(self.dpath, 'redial_context_movie_id2crslab_entityId.json')
+        self.redial_context_movie_id2crslab_entityId = json.load(open(filepath))
+
+        self.token_freq_th = self.opt['token_freq_th']
+        filepath = os.path.join(self.dpath, 'conv_tokID2freq.json')
+        conv_tokID2freq = dict(json.load(open(filepath)))
+        self.decoder_token_prob_weight = self.get_decoder_decoder_token_prob_weight(conv_tokID2freq)
+
+    def get_decoder_decoder_token_prob_weight(self, conv_tokID2freq):
+        decoder_token_prob_weight = []
+        nb_reform = 0
+        
+        for tokID in range(max(list(self.tok2ind.values())) + 1):
+            freq = conv_tokID2freq.get(tokID, 1)
+            weight = (self.token_freq_th * 1.0) / freq if freq > self.token_freq_th else 1.0
+            reform_weight = max(self.opt['coarse_weight_th'], weight)
+            if reform_weight != weight:
+                nb_reform += 1
+            decoder_token_prob_weight.append(reform_weight)
+
+        decoder_token_prob_weight = torch.FloatTensor(decoder_token_prob_weight) # (nb_tok)
+        decoder_token_prob_weight = decoder_token_prob_weight.unsqueeze(0).unsqueeze(0) # (1, 1, nb_tok)
+
+        return decoder_token_prob_weight
+
     def _load_full_data(self, data_dir):
         # combine all the data to identify missing data from initial datasets
         data = []
@@ -190,6 +215,35 @@ class ReDialDataset(BaseDataset):
         return augmented_conv_dicts
 
     def _merge_conv_data(self, dialog):
+        if self.opt['rec_model'] == 'C2CRS':
+            return self._merge_conv_data_add_entities_mask(dialog)
+        else:
+            augmented_convs = []
+            last_role = None
+            for utt in dialog:
+                text_token_ids = [self.tok2ind.get(word, self.unk_token_idx) for word in utt["text"]]
+                movie_ids = [self.entity2id[movie] for movie in utt['movies'] if movie in self.entity2id]
+                entity_ids = [self.entity2id[entity] for entity in utt['entity'] if entity in self.entity2id]
+                word_ids = [self.word2id[word] for word in utt['word'] if word in self.word2id]
+
+                if utt["role"] == last_role:
+                    augmented_convs[-1]["text"] += text_token_ids
+                    augmented_convs[-1]["movie"] += movie_ids
+                    augmented_convs[-1]["entity"] += entity_ids
+                    augmented_convs[-1]["word"] += word_ids
+                else:
+                    augmented_convs.append({
+                        "role": utt["role"],
+                        "text": text_token_ids,
+                        "entity": entity_ids,
+                        "movie": movie_ids,
+                        "word": word_ids
+                    })
+                last_role = utt["role"]
+
+            return augmented_convs
+
+    def _merge_conv_data_add_entities_mask(self, dialog):
         augmented_convs = []
         last_role = None
         for utt in dialog:
@@ -197,30 +251,73 @@ class ReDialDataset(BaseDataset):
             movie_ids = [self.entity2id[movie] for movie in utt['movies'] if movie in self.entity2id]
             entity_ids = [self.entity2id[entity] for entity in utt['entity'] if entity in self.entity2id]
             word_ids = [self.word2id[word] for word in utt['word'] if word in self.word2id]
+            entity_ids_in_context, entities_mask_in_context, entity_masks_in_context = self.get_entities_info_in_context_text(utt, text_token_ids)
 
             if utt["role"] == last_role:
-                augmented_convs[-1]["text"] += text_token_ids
+                augmented_convs[-1]["text"] += text_token_ids # [utter_len]
                 augmented_convs[-1]["movie"] += movie_ids
                 augmented_convs[-1]["entity"] += entity_ids
                 augmented_convs[-1]["word"] += word_ids
+                augmented_convs[-1]["entities_mask_in_context"] += entities_mask_in_context # [utter_len]
+                augmented_convs[-1]["entity_masks_in_context"] += entity_masks_in_context # [n_entities_in_utter_text, utter_len]
+                augmented_convs[-1]["entity_ids_in_context"] += entity_ids_in_context # [n_entities_in_utter_text]
             else:
                 augmented_convs.append({
                     "role": utt["role"],
-                    "text": text_token_ids,
+                    "text": text_token_ids, # [utter_len]
                     "entity": entity_ids,
                     "movie": movie_ids,
-                    "word": word_ids
+                    "word": word_ids,
+                    'entities_mask_in_context': entities_mask_in_context, # [utter_len]
+                    'entity_masks_in_context': entity_masks_in_context, # [n_entities_in_utter_text, utter_len]
+                    'entity_ids_in_context': entity_ids_in_context, # [n_entities_in_utter_text]
                 })
             last_role = utt["role"]
 
         return augmented_convs
+    
+    def get_entities_info_in_context_text(self, utt, text_token_ids):
+        entity_ids_in_context = []   # [n_entities_in_context_text]
+        entities_mask_in_context = []  # [utter_len]
+        entity_mask_in_context = []
+        entity_masks_in_context = [] # [n_entities_in_context_text, <=utter_len]
+        for word in utt["text"]:
+            entityId = self.word_is_entity(word)
+            if entityId:
+                entity_ids_in_context.append(entityId)
+                entities_mask_in_context.append(-1)
+                entity_mask_in_context.append(-1)
+                entity_masks_in_context.append(copy(entity_mask_in_context))
+            else:
+                entities_mask_in_context.append(0)
+                entity_mask_in_context.append(0)
+            entity_mask_in_context[-1] = 0
+        
+        # padding entity_masks_in_context
+        utter_len = len(text_token_ids)
+        for entity_mask_in_context in entity_masks_in_context:
+            entity_mask_in_context = entity_mask_in_context + [0]*(utter_len - len(entity_mask_in_context))
+        
+        return entity_ids_in_context, entities_mask_in_context, entity_masks_in_context
+    
+    def word_is_entity(self, word):
+        if '@' in word and word[1:].isdigit():
+            ID = word[1:]
+            if ID in self.redial_context_movie_id2crslab_entityId:
+                return self.redial_context_movie_id2crslab_entityId[ID]
+        return False
 
-    def _augment_and_add_default(self, raw_conv_dict):
+    def _augment_and_add(self, raw_conv_dict):
+        return self._augment_and_add_add_entities_mask(raw_conv_dict)
+
+    def _augment_and_add_add_entities_mask(self, raw_conv_dict):
         augmented_conv_dicts = []
-        context_tokens, context_entities, context_words, context_items = [], [], [], []
+        context_tokens, context_entities, context_words, context_items, entities_mask_in_contexts, entity_masks_in_contexts, entity_ids_in_contexts = [], [], [], [], [], [], []
+        pad_utters = []
         entity_set, word_set = set(), set()
         for i, conv in enumerate(raw_conv_dict):
-            text_tokens, entities, movies, words = conv["text"], conv["entity"], conv["movie"], conv["word"]
+            text_tokens, entities, movies, words, entities_mask_in_context, entity_masks_in_context, entity_ids_in_context = \
+                conv["text"], conv["entity"], conv["movie"], conv["word"], conv["entities_mask_in_context"], conv['entity_masks_in_context'], conv['entity_ids_in_context']
             if len(context_tokens) > 0:
                 conv_dict = {
                     "role": conv['role'],
@@ -229,11 +326,19 @@ class ReDialDataset(BaseDataset):
                     "context_entities": copy(context_entities),
                     "context_words": copy(context_words),
                     "context_items": copy(context_items),
+                    "entities_mask_in_context": copy(entities_mask_in_contexts),
+                    "entity_masks_in_context": copy(entity_masks_in_contexts),
+                    "entity_ids_in_context": copy(entity_ids_in_contexts),
                     "items": movies,
                 }
                 augmented_conv_dicts.append(conv_dict)
 
-            context_tokens.append(text_tokens)
+            context_tokens.append(text_tokens)  # [n_utter, utter_len]
+            entities_mask_in_contexts.append(entities_mask_in_context)  # [n_utter, utter_len]
+            # entity_masks_in_context = [n_entities_in_utter_text, utter_len]
+            padded_entity_masks_in_context = self.padd_entity_masks_in_context(pad_utters, entity_masks_in_context) # [n_entities_in_utter_text, n_utter, utter_len]
+            entity_masks_in_contexts.extend(padded_entity_masks_in_context) # [n_entities_in_context_text, n_utter, utter_len]
+            entity_ids_in_contexts.extend(entity_ids_in_context)  # [n_entities_in_context_text]
             context_items += movies
             for entity in entities + movies:
                 if entity not in entity_set:
@@ -243,8 +348,71 @@ class ReDialDataset(BaseDataset):
                 if word not in word_set:
                     word_set.add(word)
                     context_words.append(word)
+            pad_utters.append([0]*len(text_tokens))
 
         return augmented_conv_dicts
+
+    def _augment_and_add_default(self, raw_conv_dict):
+        augmented_conv_dicts = []
+        context_tokens, context_entities, context_words, context_items, entities_mask_in_contexts, entity_masks_in_contexts, entity_ids_in_contexts = [], [], [], [], [], [], []
+        pad_utters = []
+        entity_set, word_set = set(), set()
+        for i, conv in enumerate(raw_conv_dict):
+            text_tokens, entities, movies, words, entities_mask_in_context, entity_masks_in_context, entity_ids_in_context = \
+                conv["text"], conv["entity"], conv["movie"], conv["word"], conv["entities_mask_in_context"], conv['entity_masks_in_context'], conv['entity_ids_in_context']
+            if len(context_tokens) > 0:
+                conv_dict = {
+                    "role": conv['role'],
+                    "context_tokens": copy(context_tokens),
+                    "response": text_tokens,
+                    "context_entities": copy(context_entities),
+                    "context_words": copy(context_words),
+                    "context_items": copy(context_items),
+                    "entities_mask_in_context": copy(entities_mask_in_contexts),
+                    "entity_masks_in_context": copy(entity_masks_in_contexts),
+                    "entity_ids_in_context": copy(entity_ids_in_contexts),
+                    "items": movies,
+                }
+                augmented_conv_dicts.append(conv_dict)
+
+            context_tokens.append(text_tokens)  # [n_utter, utter_len]
+            entities_mask_in_contexts.append(entities_mask_in_context)  # [n_utter, utter_len]
+            # entity_masks_in_context = [n_entities_in_utter_text, utter_len]
+            padded_entity_masks_in_context = self.padd_entity_masks_in_context(pad_utters, entity_masks_in_context) # [n_entities_in_utter_text, n_utter, utter_len]
+            entity_masks_in_contexts.extend(padded_entity_masks_in_context) # [n_entities_in_context_text, n_utter, utter_len]
+            entity_ids_in_contexts.extend(entity_ids_in_context)  # [n_entities_in_context_text]
+            context_items += movies
+            for entity in entities + movies:
+                if entity not in entity_set:
+                    entity_set.add(entity)
+                    context_entities.append(entity)
+            for word in words:
+                if word not in word_set:
+                    word_set.add(word)
+                    context_words.append(word)
+            pad_utters.append([0]*len(text_tokens))
+
+        return augmented_conv_dicts
+
+    def padd_entity_masks_in_context(self, pad_utters, entity_masks_in_context):
+        # pad_utters = [n_utter, utter_len]
+        # entity_masks_in_context = [n_entities_in_utter_text, utter_len]
+        padded_entity_masks_in_context = []
+        for entity_mask_in_context in entity_masks_in_context:
+            # entity_mask_in_context = [utter_len]
+            entity_mask_in_context = pad_utters + [entity_mask_in_context] # [n_utter, utter_len]
+            padded_entity_masks_in_context.append(entity_mask_in_context)
+
+        return padded_entity_masks_in_context # [n_entities_in_utter_text, n_utter, utter_len]
+    
+    def get_pad_utters(self, context_tokens):
+        # context_tokens = [n_utter, utter_len]
+        pad_utters = []
+        for utter in context_tokens:
+            pad_utter = [0] * len(utter)
+            pad_utters.append(pad_utter)
+
+        return pad_utters
 
     def _augment_and_add_revcore(self, conv_id, raw_conv_dict):
         augmented_conv_dicts = []
@@ -317,11 +485,22 @@ class ReDialDataset(BaseDataset):
             "entity_kg": processed_entity_kg,
             "word_kg": processed_word_kg,
             "item_entity_ids": movie_entity_ids,
+            'decoder_token_prob_weight': self.decoder_token_prob_weight
         }
+
         return side_data
 
     def _entity_kg_process(self, SELF_LOOP_ID=185):
+        import re
+        def filte_entity(entity):
+            entity = entity.split('/')[-1]
+            word_list = re.split('_|\(|\)', entity)
+            word_list = [word.strip('>') for word in word_list if word != '']
+
+            return [word.lower() for word in word_list if word != '']
+
         edge_list = []  # [(entity, entity, relation)]
+        entity2neighbor = defaultdict(list)  # {entityId: List[entity]}
         for entity in range(self.n_entity):
             if str(entity) not in self.entity_kg:
                 continue
@@ -341,10 +520,15 @@ class ReDialDataset(BaseDataset):
                 edges.add((h, t, relation2id[r]))
                 entities.add(self.id2entity[h])
                 entities.add(self.id2entity[t])
+            entity2neighbor[h].append(t)
+
         return {
+            'n_entity': self.n_entity,
             'edge': list(edges),
             'n_relation': len(relation2id),
-            'entity': list(entities)
+            'entity': list(entities),
+            'entity2neighbor': dict(entity2neighbor),
+            'id2entity': {idx: entity for idx, entity in self.id2entity.items() if entity!='None'}
         }
 
     def _word_kg_process(self):
@@ -361,7 +545,8 @@ class ReDialDataset(BaseDataset):
         # edge_set = [[co[0] for co in list(edges)], [co[1] for co in list(edges)]]
         return {
             'edge': list(edges),
-            'entity': list(entities)
+            'entity': list(entities),
+            'n_entity': self.n_word
         }
 
     def padding_context(self, contexts, pad=0, transformer=True):

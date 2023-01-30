@@ -110,7 +110,6 @@ class TGReDialDataLoader(BaseDataLoader):
         self.context_truncate = opt.get('context_truncate', 256)
         self.info_truncate = opt.get('info_truncate', 128)
         self.extended_context_truncate = self.context_truncate + self.info_truncate
-        
         self.response_truncate = opt.get('response_truncate', None)
         self.entity_truncate = opt.get('entity_truncate', None)
         self.word_truncate = opt.get('word_truncate', None)
@@ -130,7 +129,7 @@ class TGReDialDataLoader(BaseDataLoader):
         self.conv_idx_to_review_info = pickle.load(open(path, 'rb'))
         logger.info(f'load {len(self.conv_idx_to_review_info)} conv_idx_to_review_info')
         self.dataset = self.malloc_information(self.dataset)
-    
+
     def malloc_information(self, dataset):
         result_dataset = []
 
@@ -144,22 +143,19 @@ class TGReDialDataLoader(BaseDataLoader):
 
     def rec_process_fn(self, *args, **kwargs):
         augment_dataset = self.rec_process_fn_given_dataset(self.dataset)
-
         return augment_dataset
     
     def rec_process_fn_given_dataset(self, dataset):
         """如果response里有多个要推荐的电影，则每个电影分别作为推荐任务的ground truth，生成一个数据样本"""
         augment_dataset = []
-        
         logger.info('[rec_process_fn_given_dataset]')
         for conv_dict in tqdm(dataset):
             for movie in conv_dict['items']:
                 augment_conv_dict = deepcopy(conv_dict)
                 augment_conv_dict['item'] = movie
-                augment_dataset.append(augment_conv_dict)
-        
+                augment_dataset.append(augment_conv_dict)      
         return augment_dataset
-    
+
     def _get_original_context_for_rec(self, context_tokens):
         # Insert special token into context. And flat the context.
         # Args:
@@ -280,7 +276,7 @@ class TGReDialDataLoader(BaseDataLoader):
                                 max_len=self.context_truncate)
 
         batch = {
-            'context': context, 
+            'context': context,
             'context_mask': (context != 0).long(),
             'context_pad_mask': (context == 0).long(),
             'inter_history_input': padded_tensor(batch_input_ids,
@@ -389,7 +385,7 @@ class TGReDialDataLoader(BaseDataLoader):
         finish_batch['eic_conv_ids'] = batch_ect_conv_ids if batch_ect_conv_ids else [-1] # [~bs*n_eic]
 
         return finish_batch
-    
+
     def rec_batchify_pipeline_add_words(self, finish_batch, batch):
         batch_context_words = []
         for i, conv_dict in enumerate(batch):
@@ -473,7 +469,69 @@ class TGReDialDataLoader(BaseDataLoader):
                               pad_tail=False,
                               max_len=self.item_truncate),
                 None)
-    
+
+    def conv_batchify_default(self, batch):
+        batch_context_tokens = []
+        batch_enhanced_context_tokens = []
+        batch_response = []
+        batch_context_entities = []
+        batch_context_entities_kbrd = []
+        batch_context_words = []
+        for conv_dict in batch:
+            context_tokens = self.build_conv_context_tokens(conv_dict)
+            batch_context_tokens.append(context_tokens)
+
+            response = self.build_conv_response(conv_dict)
+            batch_response.append(response)
+
+            context_entities = self.build_context_entities(conv_dict)
+            batch_context_entities.append(context_entities)
+
+            context_words = self.build_context_words(conv_dict)
+            batch_context_words.append(context_words)
+
+            # enhanced_topic = self.build_enhanced_topic(conv_dict)
+            # enhanced_movie = self.build_enhanced_movie(conv_dict)
+
+            # enhanced_context_tokens = self.build_enhanced_context_tokens(enhanced_movie, enhanced_topic, batch_context_tokens)
+            # batch_enhanced_context_tokens.append(enhanced_context_tokens)
+
+            context_entities_kbrd = self.build_context_entities_kbrd(conv_dict)
+            batch_context_entities_kbrd.append(context_entities_kbrd)
+
+        batch_context_tokens = padded_tensor(items=batch_context_tokens,
+                                             pad_idx=self.pad_token_idx,
+                                             max_len=self.context_truncate,
+                                             pad_tail=False)
+        batch_response = padded_tensor(batch_response,
+                                       pad_idx=self.pad_token_idx,
+                                       max_len=self.response_truncate,
+                                       pad_tail=True)
+        batch_input_ids = torch.cat((batch_context_tokens, batch_response), dim=1)
+        # batch_enhanced_context_tokens = padded_tensor(items=batch_enhanced_context_tokens,
+        #                                               pad_idx=self.pad_token_idx,
+        #                                               max_len=self.context_truncate,
+        #                                               pad_tail=False)
+        # batch_enhanced_input_ids = torch.cat((batch_enhanced_context_tokens, batch_response), dim=1)
+
+        batch = {
+            # 'enhanced_input_ids': batch_enhanced_input_ids, 
+            # 'enhanced_context_tokens': batch_enhanced_context_tokens,
+            'input_ids': batch_input_ids, 
+            'context_tokens': batch_context_tokens,
+            'context_entities_kbrd': batch_context_entities_kbrd,
+            'context_entities': padded_tensor(
+                batch_context_entities,
+                self.pad_entity_idx,
+                pad_tail=False),
+            'context_words': padded_tensor(
+                batch_context_words,
+                self.pad_word_idx,
+                pad_tail=False), 
+            'response': batch_response
+        }
+        return batch
+
     def build_conv_context_tokens(self, conv_dict):
         context_tokens = [utter + [self.conv_bos_id] for utter in conv_dict['context_tokens']]
         context_tokens[-1] = context_tokens[-1][:-1]
@@ -553,67 +611,6 @@ class TGReDialDataLoader(BaseDataLoader):
 
         return enhanced_context_tokens
 
-    def conv_batchify_default(self, batch):
-        batch_context_tokens = []
-        batch_enhanced_context_tokens = []
-        batch_response = []
-        batch_context_entities = []
-        batch_context_entities_kbrd = []
-        batch_context_words = []
-        for conv_dict in batch:
-            context_tokens = self.build_conv_context_tokens(conv_dict)
-            batch_context_tokens.append(context_tokens)
-
-            response = self.build_conv_response(conv_dict)
-            batch_response.append(response)
-
-            context_entities = self.build_context_entities(conv_dict)
-            batch_context_entities.append(context_entities)
-
-            context_words = self.build_context_words(conv_dict)
-            batch_context_words.append(context_words)
-
-            # enhanced_topic = self.build_enhanced_topic(conv_dict)
-            # enhanced_movie = self.build_enhanced_movie(conv_dict)
-
-            # enhanced_context_tokens = self.build_enhanced_context_tokens(enhanced_movie, enhanced_topic, batch_context_tokens)
-            # batch_enhanced_context_tokens.append(enhanced_context_tokens)
-
-            context_entities_kbrd = self.build_context_entities_kbrd(conv_dict)
-            batch_context_entities_kbrd.append(context_entities_kbrd)
-
-        batch_context_tokens = padded_tensor(items=batch_context_tokens,
-                                             pad_idx=self.pad_token_idx,
-                                             max_len=self.context_truncate,
-                                             pad_tail=False)
-        batch_response = padded_tensor(batch_response,
-                                       pad_idx=self.pad_token_idx,
-                                       max_len=self.response_truncate,
-                                       pad_tail=True)
-        batch_input_ids = torch.cat((batch_context_tokens, batch_response), dim=1)
-        # batch_enhanced_context_tokens = padded_tensor(items=batch_enhanced_context_tokens,
-        #                                               pad_idx=self.pad_token_idx,
-        #                                               max_len=self.context_truncate,
-        #                                               pad_tail=False)
-        # batch_enhanced_input_ids = torch.cat((batch_enhanced_context_tokens, batch_response), dim=1)
-
-        batch = {
-            # 'enhanced_input_ids': batch_enhanced_input_ids, 
-            # 'enhanced_context_tokens': batch_enhanced_context_tokens,
-            'input_ids': batch_input_ids, 
-            'context_tokens': batch_context_tokens,
-            'context_entities_kbrd': batch_context_entities_kbrd,
-            'context_entities': padded_tensor(
-                batch_context_entities,
-                self.pad_entity_idx,
-                pad_tail=False),
-            'context_words': padded_tensor(
-                batch_context_words,
-                self.pad_word_idx,
-                pad_tail=False), 
-            'response': batch_response
-        }
-        return batch
 
     def conv_batchify(self, batch):
         finish_batch = self.conv_batchify_default(batch)

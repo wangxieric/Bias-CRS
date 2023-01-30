@@ -23,7 +23,7 @@ class BaseDataLoader(ABC):
 
     """
 
-    def __init__(self, opt, dataset):
+    def __init__(self, opt, dataset, side_data=None):
         """
         Args:
             opt (Config or dict): config for dataloader or the whole system.
@@ -32,6 +32,9 @@ class BaseDataLoader(ABC):
         """
         self.opt = opt
         self.dataset = dataset
+        if self.opt['model_name'] == 'C2CRS':
+            self.log_prefix = opt['log_prefix']
+            self.side_data = side_data
         self.scale = opt.get('scale', 1)
         assert 0 < self.scale <= 1
 
@@ -63,11 +66,16 @@ class BaseDataLoader(ABC):
         for start_idx in tqdm(range(batch_num)):
             batch_idx = idx_list[start_idx * batch_size: (start_idx + 1) * batch_size]
             batch = [dataset[idx] for idx in batch_idx]
-            batch = batch_fn(batch)
-            if batch == False:
-                continue
+            if self.opt['model_name'] == 'C2CRS':
+                batch_fn_batch = batch_fn(batch)
+                origin_batch = batch
+                yield [batch_fn_batch, origin_batch]
             else:
-                yield(batch) 
+                batch = batch_fn(batch)
+                if batch == False:
+                    continue
+                else:
+                    yield(batch) 
 
     def get_conv_data(self, batch_size, shuffle=True):
         """get_data wrapper for conversation.
@@ -82,9 +90,30 @@ class BaseDataLoader(ABC):
             tuple or dict of torch.Tensor: batch data for conversation.
 
         """
-        return self.get_data(self.conv_batchify, batch_size, shuffle, self.conv_process_fn)
+        batch = self.get_data(self.conv_batchify, batch_size, shuffle, self.conv_process_fn)
+        return batch
 
-    def get_rec_data(self, batch_size, shuffle=True):
+    def get_rec_data(self, batch_size, shuffle=True, TYPE='default'):
+        """get_data wrapper for recommendation.
+
+        You can implement your own process_fn in ``rec_process_fn``, batch_fn in ``rec_batchify``.
+
+        Args:
+            batch_size (int):
+            shuffle (bool, optional): Defaults to True.
+
+        Yields:
+            tuple or dict of torch.Tensor: batch data for recommendation.
+        """
+        if self.opt['model_name'] == 'C2CRS':
+            if TYPE == 'default': 
+                return self.get_data(self.rec_batchify, batch_size, shuffle, self.rec_process_fn)
+            else:
+                raise
+        else:
+            return self.get_data(self.rec_batchify, batch_size, shuffle, self.rec_process_fn)
+
+    def get_rec_data_given_process_fn(self, batch_size, process_fn, shuffle=True):
         """get_data wrapper for recommendation.
 
         You can implement your own process_fn in ``rec_process_fn``, batch_fn in ``rec_batchify``.
@@ -97,7 +126,26 @@ class BaseDataLoader(ABC):
             tuple or dict of torch.Tensor: batch data for recommendation.
 
         """
-        return self.get_data(self.rec_batchify, batch_size, shuffle, self.rec_process_fn)
+        return self.get_data(self.rec_batchify, batch_size, shuffle, process_fn)
+    
+    def get_rec_data_from_given_dataset(self, dataset, batch_fn, batch_size, shuffle):
+        batch_fn = self.rec_batchify
+        batch_num = ceil(len(dataset) / batch_size)
+        idx_list = list(range(len(dataset)))
+        if shuffle:
+            random.shuffle(idx_list)
+
+        for start_idx in tqdm(range(batch_num)):
+            batch_idx = idx_list[start_idx * batch_size: (start_idx + 1) * batch_size]
+            batch = [dataset[idx] for idx in batch_idx]
+            yield batch_fn(batch)
+    
+    def get_rec_data_seprate_encode(self, batch_size, shuffle=True):
+        # batch_size实际拥有的最高context个数
+        return self.get_data(self.rec_batchify_seprate_encode, batch_size, shuffle, self.rec_process_fn)
+    
+    def rec_batchify_seprate_encode(self):
+        pass
 
     def get_policy_data(self, batch_size, shuffle=True):
         """get_data wrapper for policy.

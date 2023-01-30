@@ -10,5 +10,8 @@ The original codes for C2CRS model.
     - config.py
         - The codes to save model is not included in the main file
 - data
-    - init.py: get_dataloader method is overloaded for C2CRS
-    - base: side data problem!
+    <!-- - init.py: get_dataloader method is overloaded for C2CRS -->
+    - dataloader:
+        - base: OK.
+        - tgredial.py: Done!
+        - utils.py: OK.
