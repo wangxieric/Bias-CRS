@@ -336,6 +336,7 @@ class TGReDialDataset(BaseDataset):
     def _convert_to_id(self, conversation):
         augmented_convs = []
         last_role = None
+        # print('conversation keys: ', conversation.keys()) # conv_id', 'messages', 'user_id' 
         for utt in conversation['messages']:
             assert utt['role'] != last_role
             # change movies into slots
@@ -365,6 +366,8 @@ class TGReDialDataset(BaseDataset):
             user_profile = [[self.tok2ind.get(token, self.unk_token_idx) for token in sent] for sent in user_profile]
 
             augmented_convs.append({
+                "conv_id": conversation['conv_id'],
+                "user_id": conversation['user_id'],
                 "role": utt["role"],
                 "text": text_token_ids,
                 "entity": entity_ids,
@@ -394,6 +397,8 @@ class TGReDialDataset(BaseDataset):
             if len(context_tokens) > 0:
                 conv_dict = {
                     'role': conv['role'],
+                    "conv_id": conv['conv_id'],
+                    "user_id": conv['user_id'],
                     'user_profile': conv['user_profile'],
                     "context_tokens": copy(context_tokens),
                     "response": text_tokens,
@@ -407,6 +412,7 @@ class TGReDialDataset(BaseDataset):
                     'context_policy': copy(context_policy),
                     'target': policies,
                     'final': conv['final'],
+                    
                 }
                 augmented_conv_dicts.append(conv_dict)
 

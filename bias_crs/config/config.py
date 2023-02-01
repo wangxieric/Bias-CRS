@@ -87,6 +87,11 @@ class Config:
             logger.info(f'[Policy Model: {policy_model}]')
         logger.info("[Config]" + '\n' + json.dumps(self.opt, indent=4))
 
+        # bias analysis
+        if not os.path.exists("bias"):
+            os.makedirs("bias")
+        
+        
     @staticmethod
     def load_yaml_configs(filename):
         """This function reads ``yaml`` file to build config dictionary

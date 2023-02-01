@@ -12,8 +12,9 @@ import os
 import torch
 from loguru import logger
 from math import floor
-
+import pandas as pd
 from bias_crs.config import PRETRAIN_PATH
+from bias_crs.config import DATA_PATH
 from bias_crs.data import get_dataloader, dataset_language_map
 from bias_crs.evaluator.metrics.base import AverageMetric
 from bias_crs.evaluator.metrics.gen import PPLMetric
@@ -75,6 +76,10 @@ class TGReDialSystem(BaseSystem):
             self.policy_batch_size = self.policy_optim_opt['batch_size']
 
         self.language = dataset_language_map[self.opt['dataset']]
+        
+        self.bias_data_dir = os.path.join(DATA_PATH, 'bias', 'tgredial', self.opt['dataset'])
+        if not os.path.exists(self.bias_data_dir):
+            os.makedirs(self.bias_data_dir)
 
     def rec_evaluate(self, rec_predict, item_label):
         rec_predict = rec_predict.cpu()
@@ -85,6 +90,17 @@ class TGReDialSystem(BaseSystem):
         for rec_rank, item in zip(rec_ranks, item_label):
             item = self.item_ids.index(item)
             self.evaluator.rec_evaluate(rec_rank, item)
+            
+    def save_rec_bias_data(self, related_data, rec_predict):
+        rec_predict = rec_predict.cpu()
+        rec_predict = rec_predict[:, self.item_ids]
+        _, rec_ranks = torch.topk(rec_predict, 50, dim=-1)
+        related_data["Prediction"] = rec_ranks.tolist()
+        batch_data = pd.DataFrame.from_dict(related_data)
+        if os.path.exists(os.path.join(self.bias_data_dir, 'bias_analytic_data.csv')):
+            batch_data.to_csv(os.path.join(self.bias_data_dir, 'bias_analytic_data.csv'), mode='a', encoding='utf-8', header=False)
+        else:
+            batch_data.to_csv(os.path.join(self.bias_data_dir, 'bias_analytic_data.csv'), encoding='utf-8') 
 
     def policy_evaluate(self, rec_predict, movie_label):
         rec_predict = rec_predict.cpu()
@@ -114,7 +130,7 @@ class TGReDialSystem(BaseSystem):
         stage: ['policy', 'rec', 'conv']
         mode: ['train', 'val', 'test]
         """
-        batch = [ele.to(self.device) for ele in batch]
+        batch = [ele.to(self.device) if torch.is_tensor(ele) else ele for ele in batch]
         if stage == 'policy':
             if mode == 'train':
                 self.policy_model.train()
@@ -136,12 +152,13 @@ class TGReDialSystem(BaseSystem):
                 self.rec_model.train()
             else:
                 self.rec_model.eval()
-            rec_loss, rec_predict = self.rec_model.forward(batch, mode)
+            rec_loss, rec_predict, related_data = self.rec_model.forward(batch, mode)
             rec_loss = rec_loss.sum()
             if mode == "train":
                 self.backward(rec_loss)
             else:
-                self.rec_evaluate(rec_predict, batch[-1])
+                self.rec_evaluate(rec_predict, batch[-2])
+                self.save_rec_bias_data(related_data, rec_predict)
             rec_loss = rec_loss.item()
             self.evaluator.optim_metrics.add("rec_loss",
                                              AverageMetric(rec_loss))

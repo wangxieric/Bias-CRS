@@ -92,7 +92,7 @@ class TGRecModel(BaseModel):
         logger.debug('[Finish build rec layer]')
 
     def forward(self, batch, mode):
-        context, mask, input_ids, target_pos, input_mask, sample_negs, y = batch
+        context, mask, input_ids, target_pos, input_mask, sample_negs, y, related_data = batch
 
         bert_embed = self.bert(context, attention_mask=mask).pooler_output
 
@@ -103,7 +103,7 @@ class TGRecModel(BaseModel):
         rec_scores = self.fusion(embed)  # bs, item_size
 
         if mode == 'infer':
-            return rec_scores
+            return rec_scores, related_data
         else:
             rec_loss = self.rec_loss(rec_scores, y)
-            return rec_loss, rec_scores
+            return rec_loss, rec_scores, related_data

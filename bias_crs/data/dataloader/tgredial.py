@@ -150,7 +150,16 @@ class TGReDialDataLoader(BaseDataLoader):
         batch_target_pos = []
         batch_input_mask = []
         batch_sample_negs = []
-
+        
+        # for analysis
+        batch_conv_ids = []
+        batch_context_roles = []
+        batch_context_users = []
+        batch_context_items = []
+        batch_context_entities = []
+        batch_context_words = []
+        batch_context_tokens = []
+        
         for conv_dict in batch:
             context = self._process_rec_context(conv_dict['context_tokens'])
             batch_context.append(context)
@@ -170,6 +179,16 @@ class TGReDialDataLoader(BaseDataLoader):
             batch_target_pos.append(target_pos)
             batch_input_mask.append(input_mask)
             batch_sample_negs.append(sample_negs)
+            
+            # add addition data for analysis
+            batch_conv_ids.append(conv_dict['conv_id'])
+            batch_context_roles.append(conv_dict['role'])
+            batch_context_users.append(conv_dict['user_id'])
+            batch_context_items.append(context_items)
+            batch_context_entities.append(conv_dict['context_entities'])
+            batch_context_words.append(conv_dict['context_words'])
+            batch_context_tokens.append(conv_dict['context_tokens'])
+            
 
         batch_context = padded_tensor(batch_context,
                                       self.pad_token_idx,
@@ -193,7 +212,15 @@ class TGReDialDataLoader(BaseDataLoader):
                               pad_idx=self.pad_token_idx,
                               pad_tail=False,
                               max_len=self.item_truncate),
-                torch.tensor(batch_movie_id))
+                torch.tensor(batch_movie_id),
+                {"conv_id": batch_conv_ids,
+                "roles": batch_context_roles,
+                "user_id": batch_context_users,
+                "items": batch_context_items,
+                "entities": batch_context_entities,
+                "words": batch_context_words,
+                "tokens": batch_context_tokens}
+               )
 
     def rec_interact(self, data):
         context = [self._process_rec_context(data['context_tokens'])]
@@ -208,7 +235,7 @@ class TGReDialDataLoader(BaseDataLoader):
                                 self.pad_token_idx,
                                 max_len=self.context_truncate)
         mask = (context != self.pad_token_idx).long()
-
+        
         return (context, mask,
                 padded_tensor(input_ids,
                               pad_idx=self.pad_token_idx,
