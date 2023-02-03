@@ -216,10 +216,10 @@ class TGReDialDataLoader(BaseDataLoader):
                 {"conv_id": batch_conv_ids,
                 "roles": batch_context_roles,
                 "user_id": batch_context_users,
-                "items": batch_context_items,
-                "entities": batch_context_entities,
-                "words": batch_context_words,
-                "tokens": batch_context_tokens}
+                "context_item_ids": batch_context_items,
+                "entity_ids": batch_context_entities,
+                "word_ids": batch_context_words,
+                "token_ids": batch_context_tokens}
                )
 
     def rec_interact(self, data):

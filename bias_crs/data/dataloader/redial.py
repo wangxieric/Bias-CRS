@@ -69,17 +69,54 @@ class ReDialDataLoader(BaseDataLoader):
             if conversation['role'] == 'Recommender':
                 for item in conversation['items']:
                     context_entities = conversation['context_entities']
-                    dataset.append({'context_entities': context_entities, 'item': item})
+                    dataset.append({'context_entities': context_entities, 
+                                    'item': item,
+                                    'role': conversation['role'],
+                                    'conv_id': conversation['conv_id'],
+                                    'user_id': conversation['user_id'],
+                                    'context_tokens': conversation['context_tokens'],
+                                    'response': conversation['response'],
+                                    'context_words': conversation['context_words'],
+                                    'context_items': conversation['context_items']
+                                   })
         return dataset
 
     def rec_batchify(self, batch):
         batch_context_entities = []
         batch_item = []
+        
+        # for analysis
+        batch_conv_ids = []
+        batch_context_roles = []
+        batch_context_users = []
+        batch_context_items = []
+        batch_context_entities = []
+        batch_context_words = []
+        batch_context_tokens = []
+        
         for conversation in batch:
             batch_context_entities.append(conversation['context_entities'])
             batch_item.append(conversation['item'])
+            # add addition data for analysis
+            
+            batch_conv_ids.append(conversation['conv_id'])
+            batch_context_roles.append(conversation['role'])
+            batch_context_users.append(conversation['user_id'])
+            batch_context_items.append(conversation['context_items'])
+            batch_context_words.append(conversation['context_words'])
+            batch_context_tokens.append(conversation['context_tokens'])
+        
         context_entities = get_onehot(batch_context_entities, self.n_entity)
-        return {'context_entities': context_entities, 'item': torch.tensor(batch_item, dtype=torch.long)}
+        
+        return {'context_entities': context_entities, 'item': torch.tensor(batch_item, dtype=torch.long), 
+                'related_data': {"conv_id": batch_conv_ids,
+                "roles": batch_context_roles,
+                "user_id": batch_context_users,
+                "context_item_ids": batch_context_items,
+                "entity_ids": batch_context_entities,
+                "word_ids": batch_context_words,
+                "token_ids": batch_context_tokens}
+               }
 
     def conv_process_fn(self):
         dataset = []

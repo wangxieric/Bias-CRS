@@ -9,8 +9,10 @@
 
 import torch
 from loguru import logger
-
+import pandas as pd
+import os
 from bias_crs.data import dataset_language_map
+from bias_crs.config import DATA_PATH
 from bias_crs.evaluator.metrics.base import AverageMetric
 from bias_crs.evaluator.metrics.gen import PPLMetric
 from bias_crs.system.base import BaseSystem
@@ -43,6 +45,7 @@ class ReDialSystem(BaseSystem):
         self.end_token_idx = vocab['conv']['end']
         self.item_ids = side_data['rec']['item_entity_ids']
         self.id2entity = vocab['rec']['id2entity']
+        self.id2word = vocab['rec']['id2word']
 
         self.rec_optim_opt = opt['rec']
         self.conv_optim_opt = opt['conv']
@@ -52,6 +55,9 @@ class ReDialSystem(BaseSystem):
         self.conv_batch_size = self.conv_optim_opt['batch_size']
 
         self.language = dataset_language_map[self.opt['dataset']]
+        self.bias_data_dir = os.path.join(DATA_PATH, 'bias', 'redial', self.opt['dataset'])
+        if not os.path.exists(self.bias_data_dir):
+            os.makedirs(self.bias_data_dir)
 
     def rec_evaluate(self, rec_predict, item_label):
         rec_predict = rec_predict.cpu()
@@ -63,6 +69,23 @@ class ReDialSystem(BaseSystem):
             item = self.item_ids.index(item)
             self.evaluator.rec_evaluate(rec_rank, item)
 
+    def save_rec_bias_data(self, related_data, rec_predict):
+        rec_predict = rec_predict.cpu()
+        rec_predict = rec_predict[:, self.item_ids]
+        _, rec_ranks = torch.topk(rec_predict, 50, dim=-1)
+        related_data["Prediction"] = rec_ranks.tolist()
+        
+        batch_data = pd.DataFrame.from_dict(related_data)
+        
+        batch_data['context_tokens'] = batch_data['token_ids'].apply(lambda x: [self.ind2tok[idx] for idx_l in x for idx in idx_l])
+        batch_data['context_words'] = batch_data['word_ids'].apply(lambda x: [self.id2word[idx] for idx in x])
+        batch_data['context_entities'] = batch_data['entity_ids'].apply(lambda x: [self.id2entity[idx] for idx in x])
+
+        if os.path.exists(os.path.join(self.bias_data_dir, 'bias_analytic_data.csv')):
+            batch_data.to_csv(os.path.join(self.bias_data_dir, 'bias_analytic_data.csv'), mode='a', encoding='utf-8', header=False)
+        else:
+            batch_data.to_csv(os.path.join(self.bias_data_dir, 'bias_analytic_data.csv'), encoding='utf-8') 
+            
     def conv_evaluate(self, prediction, response):
         prediction = prediction.tolist()
         response = response.tolist()
@@ -71,22 +94,25 @@ class ReDialSystem(BaseSystem):
             r_str = ind2txt(r, self.ind2tok, self.end_token_idx)
             self.evaluator.gen_evaluate(p_str, [r_str])
 
-    def step(self, batch, epoch, stage, mode):
+    def step(self, batch, stage, mode):
         assert stage in ('rec', 'conv')
         assert mode in ('train', 'valid', 'test')
 
         for k, v in batch.items():
             if isinstance(v, torch.Tensor):
                 batch[k] = v.to(self.device)
-
+            else:
+                batch[k] = v
+        
         if stage == 'rec':
-            rec_loss, rec_scores = self.rec_model.forward(batch, epoch, mode=mode)
+            rec_loss, rec_scores, related_data = self.rec_model.forward(batch, mode=mode)
             rec_loss = rec_loss.sum()
             if mode == 'train':
                 self.backward(rec_loss)
             else:
-                if epoch > 3:
-                    self.rec_evaluate(rec_scores, batch['item'])
+                self.rec_evaluate(rec_scores, batch['item'])
+                if mode == "test":
+                    self.save_rec_bias_data(related_data, rec_scores)
             rec_loss = rec_loss.item()
             self.evaluator.optim_metrics.add("rec_loss", AverageMetric(rec_loss))
         else:
@@ -114,7 +140,7 @@ class ReDialSystem(BaseSystem):
             with torch.no_grad():
                 self.evaluator.reset_metrics()
                 for batch in self.valid_dataloader['rec'].get_rec_data(batch_size=self.rec_batch_size, shuffle=False):
-                    self.step(batch, epoch, stage='rec', mode='valid')
+                    self.step(batch, stage='rec', mode='valid')
                 self.evaluator.report(epoch=epoch, mode='valid')  # report valid loss
                 # early stop
                 metric = self.evaluator.optim_metrics['rec_loss']
@@ -159,7 +185,7 @@ class ReDialSystem(BaseSystem):
 
     def fit(self):
         self.train_recommender()
-        self.train_conversation()
+        # self.train_conversation()
 
     def interact(self):
         pass

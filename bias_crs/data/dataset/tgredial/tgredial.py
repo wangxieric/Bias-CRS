@@ -99,6 +99,7 @@ class TGReDialDataset(BaseDataset):
             'entity2id': self.entity2id,
             'id2entity': self.id2entity,
             'word2id': self.word2id,
+            'id2word': {idx: word for word, idx in self.word2id.items()},
             'vocab_size': len(self.tok2ind),
             'n_topic': len(self.topic2ind) + 1,
             'n_entity': self.n_entity,

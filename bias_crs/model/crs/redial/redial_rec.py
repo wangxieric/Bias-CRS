@@ -85,6 +85,7 @@ class ReDialRecModel(BaseModel):
                 {
                     'context_entities': (batch_size, n_entity),
                     'item': (batch_size)
+                    'related_data': (batch_size)
                 }
 
             mode (str)
@@ -96,4 +97,4 @@ class ReDialRecModel(BaseModel):
         scores = self.g(self.decoder(context_entities))
         loss = self.loss(scores, batch['item'])
 
-        return loss, scores
+        return loss, scores, batch['related_data']

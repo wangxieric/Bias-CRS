@@ -52,6 +52,8 @@ class TGReDialSystem(BaseSystem):
         if hasattr(self, 'rec_model'):
             self.item_ids = side_data['rec']['item_entity_ids']
             self.id2entity = vocab['rec']['id2entity']
+            self.id2token = vocab['rec']['ind2tok']
+            self.id2word = vocab['rec']['id2word']
 
         if hasattr(self, 'rec_model'):
             self.rec_optim_opt = self.opt['rec']
@@ -96,7 +98,13 @@ class TGReDialSystem(BaseSystem):
         rec_predict = rec_predict[:, self.item_ids]
         _, rec_ranks = torch.topk(rec_predict, 50, dim=-1)
         related_data["Prediction"] = rec_ranks.tolist()
+        
         batch_data = pd.DataFrame.from_dict(related_data)
+        
+        batch_data['context_tokens'] = batch_data['token_ids'].apply(lambda x: [self.id2token[idx] for idx_l in x for idx in idx_l])
+        batch_data['context_words'] = batch_data['word_ids'].apply(lambda x: [self.id2word[idx] for idx in x])
+        batch_data['context_entities'] = batch_data['entity_ids'].apply(lambda x: [self.id2entity[idx] for idx in x])
+
         if os.path.exists(os.path.join(self.bias_data_dir, 'bias_analytic_data.csv')):
             batch_data.to_csv(os.path.join(self.bias_data_dir, 'bias_analytic_data.csv'), mode='a', encoding='utf-8', header=False)
         else:
@@ -158,7 +166,8 @@ class TGReDialSystem(BaseSystem):
                 self.backward(rec_loss)
             else:
                 self.rec_evaluate(rec_predict, batch[-2])
-                self.save_rec_bias_data(related_data, rec_predict)
+                if mode == "test":
+                    self.save_rec_bias_data(related_data, rec_predict)
             rec_loss = rec_loss.item()
             self.evaluator.optim_metrics.add("rec_loss",
                                              AverageMetric(rec_loss))
@@ -307,7 +316,8 @@ class TGReDialSystem(BaseSystem):
         if hasattr(self, 'policy_model'):
             self.train_policy()
         if hasattr(self, 'conv_model'):
-            self.train_conversation()
+            pass
+            # self.train_conversation()
 
     def interact(self):
         self.init_interact()

@@ -73,6 +73,7 @@ class ReDialDataset(BaseDataset):
         self.unk_token_idx = self.special_token_idx['unk']
         dpath = os.path.join(DATASET_PATH, "redial", tokenize)
         self.opt = opt
+        self.full_data = self._load_full_data(os.path.join(ROOT_PATH, "bias_crs/data/dataset/redial", 'full_raw_data/'))
         # load specific data for models
         if self.opt["rec_model"] == 'RevCoreRec':
             self.subkg = pkl.load(open(os.path.join(ROOT_PATH, "bias_crs/data/dataset/redial", 'revcore_data/subkg.pkl'), 'rb'))
@@ -85,7 +86,7 @@ class ReDialDataset(BaseDataset):
                             encoding='utf-8'))
             self.stopwords = set([word.strip() for word in open(os.path.join(ROOT_PATH, "bias_crs/data/dataset/redial",'revcore_data/stopwords.txt'),
                             encoding='utf-8')])
-            self.full_data = self._load_full_data(os.path.join(ROOT_PATH, "bias_crs/data/dataset/redial", 'full_raw_data/'))
+            # self.full_data = self._load_full_data(os.path.join(ROOT_PATH, "bias_crs/data/dataset/redial", 'full_raw_data/'))
             self.corpus = []
         super().__init__(opt, dpath, resource, restore, save)
 
@@ -102,6 +103,7 @@ class ReDialDataset(BaseDataset):
             'entity2id': self.entity2id,
             'id2entity': self.id2entity,
             'word2id': self.word2id,
+            'id2word': {idx: word for word, idx in self.word2id.items()},
             'vocab_size': len(self.tok2ind),
             'n_entity': self.n_entity,
             'n_word': self.n_word,
@@ -179,8 +181,11 @@ class ReDialDataset(BaseDataset):
         logger.debug("[Finish side data process]")
         return processed_train_data, processed_valid_data, processed_test_data, processed_side_data
 
+    def _data_preprocess_uccr(self, train_data, valid_data, test_data):
+        pass
+    
     def _raw_data_process(self, raw_data):
-        augmented_convs = {conversation['conv_id']: self._merge_conv_data(conversation["dialog"]) for conversation in tqdm(raw_data)}
+        augmented_convs = {conversation['conv_id']: self._merge_conv_data(conversation) for conversation in tqdm(raw_data)}
         augmented_conv_dicts = []
         for conv_id, conv in tqdm(augmented_convs.items()):
             if self.opt["rec_model"] == 'RevCoreRec':
@@ -189,9 +194,10 @@ class ReDialDataset(BaseDataset):
                 augmented_conv_dicts.extend(self._augment_and_add_default(conv))
         return augmented_conv_dicts
 
-    def _merge_conv_data(self, dialog):
+    def _merge_conv_data(self, conversation):
         augmented_convs = []
         last_role = None
+        dialog = conversation['dialog']
         for utt in dialog:
             text_token_ids = [self.tok2ind.get(word, self.unk_token_idx) for word in utt["text"]]
             movie_ids = [self.entity2id[movie] for movie in utt['movies'] if movie in self.entity2id]
@@ -205,6 +211,7 @@ class ReDialDataset(BaseDataset):
                 augmented_convs[-1]["word"] += word_ids
             else:
                 augmented_convs.append({
+                    "conv_id": conversation['conv_id'],
                     "role": utt["role"],
                     "text": text_token_ids,
                     "entity": entity_ids,
@@ -219,11 +226,15 @@ class ReDialDataset(BaseDataset):
         augmented_conv_dicts = []
         context_tokens, context_entities, context_words, context_items = [], [], [], []
         entity_set, word_set = set(), set()
+        
         for i, conv in enumerate(raw_conv_dict):
             text_tokens, entities, movies, words = conv["text"], conv["entity"], conv["movie"], conv["word"]
+            contexts = self.full_data[conv['conv_id']]['messages']
             if len(context_tokens) > 0:
                 conv_dict = {
                     "role": conv['role'],
+                    "conv_id": conv['conv_id'],
+                    "user_id": contexts[i]['senderWorkerId'],
                     "context_tokens": copy(context_tokens),
                     "response": text_tokens,
                     "context_entities": copy(context_entities),
@@ -275,6 +286,8 @@ class ReDialDataset(BaseDataset):
                 response,_,_,_,_ = self.padding_w2v(text_tokens_text, self.opt['max_r_length'])
                 conv_dict = {
                     "role": conv['role'],
+                    "conv_id": conv['conv_id'],
+                    "user_id": contexts[idx]['senderWorkerId'],
                     "user": contexts[idx]['senderWorkerId'],
                     "context_tokens": copy(context_tokens),
                     "response": text_tokens,
