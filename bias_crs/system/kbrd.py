@@ -12,7 +12,9 @@ import os
 
 import torch
 from loguru import logger
-
+import pandas as pd
+import os
+from bias_crs.config import DATA_PATH
 from bias_crs.evaluator.metrics.base import AverageMetric
 from bias_crs.evaluator.metrics.gen import PPLMetric
 from bias_crs.system.base import BaseSystem
@@ -43,6 +45,8 @@ class KBRDSystem(BaseSystem):
                                          restore_system, interact, debug, tensorboard)
 
         self.ind2tok = vocab['ind2tok']
+        self.id2word = vocab['id2word']
+        self.id2entity = vocab['id2entity']
         self.end_token_idx = vocab['end']
         self.item_ids = side_data['item_entity_ids']
 
@@ -52,7 +56,10 @@ class KBRDSystem(BaseSystem):
         self.conv_epoch = self.conv_optim_opt['epoch']
         self.rec_batch_size = self.rec_optim_opt['batch_size']
         self.conv_batch_size = self.conv_optim_opt['batch_size']
-
+        self.bias_data_dir = os.path.join(DATA_PATH, 'bias', 'kbrd', self.opt['dataset'])
+        if not os.path.exists(self.bias_data_dir):
+            os.makedirs(self.bias_data_dir)
+            
     def rec_evaluate(self, rec_predict, item_label):
         rec_predict = rec_predict.cpu()
         rec_predict = rec_predict[:, self.item_ids]
@@ -62,7 +69,24 @@ class KBRDSystem(BaseSystem):
         for rec_rank, label in zip(rec_ranks, item_label):
             label = self.item_ids.index(label)
             self.evaluator.rec_evaluate(rec_rank, label)
+    
+    def save_rec_bias_data(self, related_data, rec_predict):
+        rec_predict = rec_predict.cpu()
+        rec_predict = rec_predict[:, self.item_ids]
+        _, rec_ranks = torch.topk(rec_predict, 50, dim=-1)
+        related_data["Prediction"] = rec_ranks.tolist()
+        
+        batch_data = pd.DataFrame.from_dict(related_data)
+        
+        batch_data['context_tokens'] = batch_data['token_ids'].apply(lambda x: [self.ind2tok[idx] for idx_l in x for idx in idx_l])
+        batch_data['context_words'] = batch_data['word_ids'].apply(lambda x: [self.id2word[idx] for idx in x])
+        batch_data['context_entities'] = batch_data['entity_ids'].apply(lambda x: [self.id2entity[idx] for idx in x])
 
+        if os.path.exists(os.path.join(self.bias_data_dir, 'bias_analytic_data.csv')):
+            batch_data.to_csv(os.path.join(self.bias_data_dir, 'bias_analytic_data.csv'), mode='a', encoding='utf-8', header=False)
+        else:
+            batch_data.to_csv(os.path.join(self.bias_data_dir, 'bias_analytic_data.csv'), encoding='utf-8') 
+            
     def conv_evaluate(self, prediction, response):
         prediction = prediction.tolist()
         response = response.tolist()
@@ -78,13 +102,17 @@ class KBRDSystem(BaseSystem):
         for k, v in batch.items():
             if isinstance(v, torch.Tensor):
                 batch[k] = v.to(self.device)
-
+            else:
+                batch[k] = v
+                
         if stage == 'rec':
-            rec_loss, rec_scores = self.model.forward(batch, mode, stage)
+            rec_loss, rec_scores, related_data = self.model.forward(batch, mode, stage)
             rec_loss = rec_loss.sum()
             if mode == 'train':
                 self.backward(rec_loss)
             else:
+                if mode == "test":
+                    self.save_rec_bias_data(related_data, rec_scores)
                 self.rec_evaluate(rec_scores, batch['item'])
             rec_loss = rec_loss.item()
             self.evaluator.optim_metrics.add("rec_loss", AverageMetric(rec_loss))
@@ -168,7 +196,7 @@ class KBRDSystem(BaseSystem):
 
     def fit(self):
         self.train_recommender()
-        self.train_conversation()
+        # self.train_conversation()
 
     def interact(self):
         pass

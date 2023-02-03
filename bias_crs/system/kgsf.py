@@ -11,7 +11,9 @@ import os
 
 import torch
 from loguru import logger
-
+import pandas as pd
+import os
+from bias_crs.config import DATA_PATH
 from bias_crs.evaluator.metrics.base import AverageMetric
 from bias_crs.evaluator.metrics.gen import PPLMetric
 from bias_crs.system.base import BaseSystem
@@ -44,7 +46,9 @@ class KGSFSystem(BaseSystem):
         self.ind2tok = vocab['ind2tok']
         self.end_token_idx = vocab['end']
         self.item_ids = side_data['item_entity_ids']
-
+        self.id2word = vocab['id2word']
+        self.id2entity = vocab['id2entity']
+        
         self.pretrain_optim_opt = self.opt['pretrain']
         self.rec_optim_opt = self.opt['rec']
         self.conv_optim_opt = self.opt['conv']
@@ -54,6 +58,11 @@ class KGSFSystem(BaseSystem):
         self.pretrain_batch_size = self.pretrain_optim_opt['batch_size']
         self.rec_batch_size = self.rec_optim_opt['batch_size']
         self.conv_batch_size = self.conv_optim_opt['batch_size']
+        
+        self.bias_data_dir = os.path.join(DATA_PATH, 'bias', 'kgsf', self.opt['dataset'])
+        if not os.path.exists(self.bias_data_dir):
+            os.makedirs(self.bias_data_dir)
+            
 
     def rec_evaluate(self, rec_predict, item_label):
         rec_predict = rec_predict.cpu()
@@ -65,6 +74,23 @@ class KGSFSystem(BaseSystem):
             item = self.item_ids.index(item)
             self.evaluator.rec_evaluate(rec_rank, item)
 
+    def save_rec_bias_data(self, related_data, rec_predict):
+        rec_predict = rec_predict.cpu()
+        rec_predict = rec_predict[:, self.item_ids]
+        _, rec_ranks = torch.topk(rec_predict, 50, dim=-1)
+        related_data["Prediction"] = rec_ranks.tolist()
+        
+        batch_data = pd.DataFrame.from_dict(related_data)
+        
+        batch_data['context_tokens'] = batch_data['token_ids'].apply(lambda x: [self.ind2tok[idx] for idx_l in x for idx in idx_l])
+        batch_data['context_words'] = batch_data['word_ids'].apply(lambda x: [self.id2word[idx] for idx in x])
+        batch_data['context_entities'] = batch_data['entity_ids'].apply(lambda x: [self.id2entity[idx] for idx in x])
+
+        if os.path.exists(os.path.join(self.bias_data_dir, 'bias_analytic_data.csv')):
+            batch_data.to_csv(os.path.join(self.bias_data_dir, 'bias_analytic_data.csv'), mode='a', encoding='utf-8', header=False)
+        else:
+            batch_data.to_csv(os.path.join(self.bias_data_dir, 'bias_analytic_data.csv'), encoding='utf-8') 
+            
     def conv_evaluate(self, prediction, response):
         prediction = prediction.tolist()
         response = response.tolist()
@@ -74,7 +100,7 @@ class KGSFSystem(BaseSystem):
             self.evaluator.gen_evaluate(p_str, [r_str])
 
     def step(self, batch, stage, mode):
-        batch = [ele.to(self.device) for ele in batch]
+        batch = [ele.to(self.device) if torch.is_tensor(ele) else ele for ele in batch]
         if stage == 'pretrain':
             info_loss = self.model.forward(batch, stage, mode)
             if info_loss is not None:
@@ -82,7 +108,7 @@ class KGSFSystem(BaseSystem):
                 info_loss = info_loss.sum().item()
                 self.evaluator.optim_metrics.add("info_loss", AverageMetric(info_loss))
         elif stage == 'rec':
-            rec_loss, info_loss, rec_predict = self.model.forward(batch, stage, mode)
+            rec_loss, info_loss, rec_predict, related_data = self.model.forward(batch, stage, mode)
             if info_loss:
                 loss = rec_loss + 0.025 * info_loss
             else:
@@ -90,7 +116,9 @@ class KGSFSystem(BaseSystem):
             if mode == "train":
                 self.backward(loss.sum())
             else:
-                self.rec_evaluate(rec_predict, batch[-1])
+                if mode == "test":
+                    self.save_rec_bias_data(related_data, rec_predict)
+                self.rec_evaluate(rec_predict, batch[-2])
             rec_loss = rec_loss.sum().item()
             self.evaluator.optim_metrics.add("rec_loss", AverageMetric(rec_loss))
             if info_loss:
@@ -183,7 +211,7 @@ class KGSFSystem(BaseSystem):
     def fit(self):
         self.pretrain()
         self.train_recommender()
-        self.train_conversation()
+        # self.train_conversation()
 
     def interact(self):
         pass

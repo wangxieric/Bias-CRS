@@ -58,21 +58,54 @@ class KBRDDataLoader(BaseDataLoader):
         for conv_dict in tqdm(self.dataset):
             if conv_dict['role'] == 'Recommender':
                 for movie in conv_dict['items']:
-                    augment_conv_dict = {'context_entities': conv_dict['context_entities'], 'item': movie}
+                    augment_conv_dict = {'context_entities': conv_dict['context_entities'], 'item': movie, 
+                                        'role': conv_dict['role'],
+                                        'conv_id': conv_dict['conv_id'],
+                                        'user_id': conv_dict['user_id'],
+                                        'context_tokens': conv_dict['context_tokens'],
+                                        'response': conv_dict['response'],
+                                        'context_words': conv_dict['context_words'],
+                                        'context_items': conv_dict['context_items']}
                     augment_dataset.append(augment_conv_dict)
         return augment_dataset
 
     def rec_batchify(self, batch):
         batch_context_entities = []
         batch_movies = []
+        
+        # for analysis
+        batch_conv_ids = []
+        batch_context_roles = []
+        batch_context_users = []
+        batch_context_items = []
+        batch_context_entities = []
+        batch_context_words = []
+        batch_context_tokens = []
+        
         for conv_dict in batch:
             batch_context_entities.append(conv_dict['context_entities'])
             batch_movies.append(conv_dict['item'])
+            
+            # add addition data for analysis
+            batch_conv_ids.append(conv_dict['conv_id'])
+            batch_context_roles.append(conv_dict['role'])
+            batch_context_users.append(conv_dict['user_id'])
+            batch_context_items.append(conv_dict['context_items'])
+            # batch_context_entities.append(conv_dict['context_entities'])
+            batch_context_words.append(conv_dict['context_words'])
+            batch_context_tokens.append(conv_dict['context_tokens'])
 
         return {
             "context_entities": batch_context_entities,
-            "item": torch.tensor(batch_movies, dtype=torch.long)
-        }
+            "item": torch.tensor(batch_movies, dtype=torch.long),
+            'related_data': {"conv_id": batch_conv_ids,
+            "roles": batch_context_roles,
+            "user_id": batch_context_users,
+            "context_item_ids": batch_context_items,
+            "entity_ids": batch_context_entities,
+            "word_ids": batch_context_words,
+            "token_ids": batch_context_tokens}
+            }
 
     def conv_process_fn(self, *args, **kwargs):
         return self.retain_recommender_target()

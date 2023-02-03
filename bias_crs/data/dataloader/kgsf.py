@@ -90,16 +90,41 @@ class KGSFDataLoader(BaseDataLoader):
         batch_context_entities = []
         batch_context_words = []
         batch_item = []
+        
+         # for analysis
+        batch_conv_ids = []
+        batch_context_roles = []
+        batch_context_users = []
+        batch_context_items = []
+        batch_context_words = []
+        batch_context_tokens = []
+        
         for conv_dict in batch:
             batch_context_entities.append(
                 truncate(conv_dict['context_entities'], self.entity_truncate, truncate_tail=False))
             batch_context_words.append(truncate(conv_dict['context_words'], self.word_truncate, truncate_tail=False))
             batch_item.append(conv_dict['item'])
+            
+            # add addition data for analysis
+            batch_conv_ids.append(conv_dict['conv_id'])
+            batch_context_roles.append(conv_dict['role'])
+            batch_context_users.append(conv_dict['user_id'])
+            batch_context_items.append(conv_dict['context_items'])
+            batch_context_tokens.append(conv_dict['context_tokens'])
+            
 
         return (padded_tensor(batch_context_entities, self.pad_entity_idx, pad_tail=False),
                 padded_tensor(batch_context_words, self.pad_word_idx, pad_tail=False),
                 get_onehot(batch_context_entities, self.n_entity),
-                torch.tensor(batch_item, dtype=torch.long))
+                torch.tensor(batch_item, dtype=torch.long),
+                {"conv_id": batch_conv_ids,
+                "roles": batch_context_roles,
+                "user_id": batch_context_users,
+                "context_item_ids": batch_context_items,
+                "entity_ids": batch_context_entities,
+                "word_ids": batch_context_words,
+                "token_ids": batch_context_tokens}
+               )
 
     def conv_process_fn(self, *args, **kwargs):
         return self.retain_recommender_target()

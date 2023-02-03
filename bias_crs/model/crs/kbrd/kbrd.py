@@ -188,7 +188,7 @@ class KBRDModel(BaseModel):
         user_embedding = self.encode_user(context_entities, kg_embedding)
         scores = F.linear(user_embedding, kg_embedding, self.rec_bias.bias)
         loss = self.rec_loss(scores, item)
-        return loss, scores
+        return loss, scores, batch['related_data']
 
     def _starts(self, batch_size):
         """Return bsz start tokens."""

@@ -244,7 +244,7 @@ class KGSFModel(BaseModel):
         context_words: (batch_size, word_length)
         movie: (batch_size)
         """
-        context_entities, context_words, entities, movie = batch
+        context_entities, context_words, entities, movie, related_data = batch
 
         entity_graph_representations = self.entity_encoder(None, self.entity_edge_idx, self.entity_edge_type)
         word_graph_representations = self.word_encoder(self.word_kg_embedding.weight, self.word_edges)
@@ -272,7 +272,7 @@ class KGSFModel(BaseModel):
                                     self.infomax_bias.bias)  # (bs, #entity)
             info_loss = self.infomax_loss(info_predict, entities) / info_loss_mask
 
-        return rec_loss, info_loss, rec_scores
+        return rec_loss, info_loss, rec_scores, related_data
 
     def freeze_parameters(self):
         freeze_models = [self.word_kg_embedding, self.entity_encoder, self.entity_self_attn, self.word_encoder,
