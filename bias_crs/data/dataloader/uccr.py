@@ -121,6 +121,13 @@ class UCCRDataLoader(BaseDataLoader):
         batch_h_entities_pos = []
         batch_h_items = []
         batch_user_id = []
+        
+        # for analysis
+        batch_conv_ids = []
+        batch_context_roles = []
+        batch_context_users = []
+        batch_context_tokens = []
+        
         for kkk in range(len(batch)):
             conv_dict = batch[kkk]
             batch_user_id.append(conv_dict['user_id'])
@@ -178,7 +185,11 @@ class UCCRDataLoader(BaseDataLoader):
             batch_h_entities[kkk].append(
                 truncate(conv_dict['context_entities'], self.entity_truncate, truncate_tail=False))
             '''
-
+        # add addition data for analysis
+        batch_conv_ids.append(conv_dict['conv_id'])
+        batch_context_roles.append(conv_dict['role'])
+        batch_context_users.append(conv_dict['user_id'])
+        batch_context_tokens.append(conv_dict['context_tokens'])
         
         padded_history_words = []
         padded_history_words_pos = []
@@ -228,7 +239,15 @@ class UCCRDataLoader(BaseDataLoader):
                 torch.tensor(batch_time_id, dtype=torch.long),
                 return_nbcei,
                 return_nbcw,
-                return_nbcel)
+                return_nbcel,
+                {"conv_id": batch_conv_ids,
+                "roles": batch_context_roles,
+                "user_id": batch_context_users,
+                "context_item_ids": batch_history_items,
+                "entity_ids": batch_context_entities,
+                "word_ids": batch_context_words,
+                "token_ids": batch_context_tokens}
+               )
 
     def rec_process_fn(self):
         augment_dataset = []
@@ -253,6 +272,13 @@ class UCCRDataLoader(BaseDataLoader):
         batch_h_entities_pos = []
         batch_h_items = []
         batch_user_id = []
+        
+        # for analysis
+        batch_conv_ids = []
+        batch_context_roles = []
+        batch_context_users = []
+        batch_context_tokens = []
+        
         for kkk in range(len(batch)):
             conv_dict = batch[kkk]
             batch_user_id.append(conv_dict['user_id'])
@@ -268,6 +294,13 @@ class UCCRDataLoader(BaseDataLoader):
             h_entity = []
             h_entity_pos = []
             h_item = []
+            
+            # add addition data for analysis
+            batch_conv_ids.append(conv_dict['conv_id'])
+            batch_context_roles.append(conv_dict['role'])
+            batch_context_users.append(conv_dict['user_id'])
+            batch_context_tokens.append(conv_dict['context_tokens'])
+            
             for i in range(len(conv_dict['histories'])):
                 #import pdb
                 #pdb.set_trace()
@@ -361,7 +394,15 @@ class UCCRDataLoader(BaseDataLoader):
                 torch.tensor(batch_item, dtype=torch.long),
                 return_nbcei,
                 return_nbcw,
-                return_nbcel)
+                return_nbcel,
+                {"conv_id": batch_conv_ids,
+                "roles": batch_context_roles,
+                "user_id": batch_context_users,
+                "context_item_ids": batch_history_items,
+                "entity_ids": batch_context_entities,
+                "word_ids": batch_context_words,
+                "token_ids": batch_context_tokens}
+               )
 
     def pretrain_conv_process_fn(self, *args, **kwargs):
         return self.retain_recommender_target()

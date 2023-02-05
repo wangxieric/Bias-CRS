@@ -325,7 +325,7 @@ class UCCRModel(BaseModel):
         words: (batch_size, word_length)
         entity_labels: (batch_size, n_entity)
         """
-        entity_indexs, words, history_items, history_items_pos, entity_labels, word_labels, item_labels, h_words, h_words_pos, h_entities, h_entities_pos, h_items, user_id, time_id = batch
+        entity_indexs, words, history_items, history_items_pos, entity_labels, word_labels, item_labels, h_words, h_words_pos, h_entities, h_entities_pos, h_items, user_id, time_id, related_data = batch
         neg_entity_indexs_list, neg_words_list, neg_entity_labels_list = neg_batches
 
         loss_mask_1 = torch.sum(entity_labels)
@@ -402,7 +402,7 @@ class UCCRModel(BaseModel):
         return None, loss
 
     def get_tr_history_reps(self, batch, neg_batches, mode):
-        context_entities, context_words, history_items, history_items_pos, entities, word_labels, item_labels, h_words, h_words_pos, h_entities, h_entities_pos, h_items, user_id, time_id, movie = batch
+        context_entities, context_words, history_items, history_items_pos, entities, word_labels, item_labels, h_words, h_words_pos, h_entities, h_entities_pos, h_items, user_id, time_id, movie, related_data = batch
         neg_entity_indexs_list, neg_words_list, neg_entity_labels_list = neg_batches
 
         entity_graph_representations = self.entity_encoder(None, self.entity_edge_idx, self.entity_edge_type)
@@ -503,7 +503,7 @@ class UCCRModel(BaseModel):
         delta_e = 0.85
         tau_e = 6
         
-        context_entities, context_words, history_items, history_items_pos, entities, word_labels, item_labels, h_words, h_words_pos, h_entities, h_entities_pos, h_items, user_id, time_id, movie = batch
+        context_entities, context_words, history_items, history_items_pos, entities, word_labels, item_labels, h_words, h_words_pos, h_entities, h_entities_pos, h_items, user_id, time_id, movie, related_data = batch
         neg_entity_indexs_list, neg_words_list, neg_entity_labels_list = neg_batches
 
         entity_graph_representations = self.entity_encoder(None, self.entity_edge_idx, self.entity_edge_type)
@@ -527,14 +527,14 @@ class UCCRModel(BaseModel):
         rec_loss = self.rec_loss(rec_scores, movie)
         
         
-        return rec_loss, None, rec_scores
+        return rec_loss, None, rec_scores, related_data
     
     
     def recommend_training(self, batch, neg_batches, tr_his_words_reps, tr_his_entities_reps, tr_his_items_reps, tr_word_attn_rep, tr_entity_attn_rep, tr_user_id, mode):
         delta_e = 0.85
         tau_e = 6
         
-        context_entities, context_words, history_items, history_items_pos, entities, word_labels, item_labels, h_words, h_words_pos, h_entities, h_entities_pos, h_items, user_id, time_id, movie = batch
+        context_entities, context_words, history_items, history_items_pos, entities, word_labels, item_labels, h_words, h_words_pos, h_entities, h_entities_pos, h_items, user_id, time_id, movie, related_data = batch
         neg_entity_indexs_list, neg_words_list, neg_entity_labels_list = neg_batches
 
         entity_graph_representations = self.entity_encoder(None, self.entity_edge_idx, self.entity_edge_type)
@@ -648,7 +648,7 @@ class UCCRModel(BaseModel):
         
         #context_entities, context_words, history_items, history_items_pos, entities, word_labels, item_labels, h_words, h_entities, h_items, user_id, time_id, movie
         
-        context_tokens, context_entities, context_words, history_items, h_words, h_entities, h_items, user_id, response = batch
+        context_tokens, context_entities, context_words, history_items, h_words, h_entities, h_items, user_id, response, related_data = batch
 
         entity_graph_representations = self.entity_encoder(None, self.entity_edge_idx, self.entity_edge_type)
         word_graph_representations = self.word_encoder(self.word_kg_embedding.weight, self.word_edges)
