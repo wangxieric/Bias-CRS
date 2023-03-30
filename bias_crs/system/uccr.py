@@ -68,23 +68,26 @@ class UCCRSystem(BaseSystem):
         _, rec_ranks = torch.topk(rec_predict, 50, dim=-1)
         rec_ranks = rec_ranks.tolist()
         item_label = item_label.tolist()
+        self.evaluator.reset_metrics()
         for rec_rank, item in zip(rec_ranks, item_label):
             item = self.item_ids.index(item)
             self.evaluator.rec_evaluate(rec_rank, item)
+        # self.evaluator.report()
+            
 
-    def save_rec_bias_data(self, related_data, rec_predict):
+    def save_rec_bias_data(self, related_data, item, rec_predict):
+        print("------------------ save_rec_bias_data ------------------")
         rec_predict = rec_predict.cpu()
         rec_predict = rec_predict[:, self.item_ids]
-        # print("related_data: ", related_data)
         _, rec_ranks = torch.topk(rec_predict, 50, dim=-1)
         related_data["Prediction"] = rec_ranks.tolist()
         
         batch_data = pd.DataFrame.from_dict(related_data)
-        
         batch_data['context_tokens'] = batch_data['token_ids'].apply(lambda x: [self.ind2tok[idx] for idx_l in x for idx in idx_l])
         batch_data['context_words'] = batch_data['word_ids'].apply(lambda x: [self.id2word[idx] for idx in x])
         batch_data['context_entities'] = batch_data['entity_ids'].apply(lambda x: [self.id2entity[idx] for idx in x])
-
+        batch_data['target_item'] = item.detach().cpu().numpy()
+        
         if os.path.exists(os.path.join(self.bias_data_dir, 'bias_analytic_data.csv')):
             batch_data.to_csv(os.path.join(self.bias_data_dir, 'bias_analytic_data.csv'), mode='a', encoding='utf-8', header=False)
         else:
@@ -104,7 +107,7 @@ class UCCRSystem(BaseSystem):
             r_str = ind2txt(r, self.ind2tok, self.end_token_idx)
             self.evaluator.gen_evaluate(p_str, [r_str])
 
-    def step(self, batch_all, stage, mode):
+    def step(self, batch_all, stage, mode, save=False):
         if stage != 'conv':
             if stage == 'pretrain_conv':
                 batch = batch_all
@@ -156,8 +159,8 @@ class UCCRSystem(BaseSystem):
 
             if mode != 'train':
                 rec_loss, info_loss, rec_predict, related_data = self.model.recommend_test(batch, neg_batches, self.tr_his_words_reps, self.tr_his_entities_reps, self.tr_his_items_reps, self.tr_word_attn_rep, self.tr_entity_attn_rep, self.tr_user_id, mode)
-                if mode == "test":
-                    self.save_rec_bias_data(related_data, rec_predict)
+                if save:
+                    self.save_rec_bias_data(related_data, batch[-2], rec_predict)
             else:
                 rec_loss, info_loss, rec_predict = self.model.recommend_training(batch, neg_batches, self.tr_his_words_reps, self.tr_his_entities_reps, self.tr_his_items_reps, self.tr_word_attn_rep, self.tr_entity_attn_rep, self.tr_user_id, mode)
                 
@@ -251,7 +254,7 @@ class UCCRSystem(BaseSystem):
         with torch.no_grad():
             self.evaluator.reset_metrics()
             for batch in self.test_dataloader.get_rec_data(self.rec_batch_size, shuffle=False):
-                self.step(batch, stage='rec', mode='test')
+                self.step(batch, stage='rec', mode='test', save=True)
             self.evaluator.report()
             
     def train_conversation(self):
