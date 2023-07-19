@@ -93,7 +93,7 @@ class TGReDialSystem(BaseSystem):
             item = self.item_ids.index(item)
             self.evaluator.rec_evaluate(rec_rank, item)
             
-    def save_rec_bias_data(self, related_data, rec_predict):
+    def save_rec_bias_data(self, related_data, rec_predict, item):
         rec_predict = rec_predict.cpu()
         rec_predict = rec_predict[:, self.item_ids]
         _, rec_ranks = torch.topk(rec_predict, 50, dim=-1)
@@ -104,7 +104,8 @@ class TGReDialSystem(BaseSystem):
         batch_data['context_tokens'] = batch_data['token_ids'].apply(lambda x: [self.id2token[idx] for idx_l in x for idx in idx_l])
         batch_data['context_words'] = batch_data['word_ids'].apply(lambda x: [self.id2word[idx] for idx in x])
         batch_data['context_entities'] = batch_data['entity_ids'].apply(lambda x: [self.id2entity[idx] for idx in x])
-
+        batch_data['target_item_index'] = item.detach().cpu().numpy()
+        
         if os.path.exists(os.path.join(self.bias_data_dir, 'bias_analytic_data.csv')):
             batch_data.to_csv(os.path.join(self.bias_data_dir, 'bias_analytic_data.csv'), mode='a', encoding='utf-8', header=False)
         else:
@@ -167,7 +168,7 @@ class TGReDialSystem(BaseSystem):
             else:
                 self.rec_evaluate(rec_predict, batch[-2])
                 if mode == "test":
-                    self.save_rec_bias_data(related_data, rec_predict)
+                    self.save_rec_bias_data(related_data, rec_predict, batch[-2])
             rec_loss = rec_loss.item()
             self.evaluator.optim_metrics.add("rec_loss",
                                              AverageMetric(rec_loss))
@@ -213,8 +214,7 @@ class TGReDialSystem(BaseSystem):
         for epoch in range(self.rec_epoch):
             self.evaluator.reset_metrics()
             logger.info(f'[Recommendation epoch {str(epoch)}]')
-            for batch in self.train_dataloader['rec'].get_rec_data(self.rec_batch_size,
-                                                                   shuffle=True):
+            for batch in self.train_dataloader['rec'].get_rec_data(self.rec_batch_size, batch_mode='popnudge', shuffle=True):
                 self.step(batch, stage='rec', mode='train')
             self.evaluator.report(epoch=epoch, mode='train')
             # val
@@ -340,7 +340,7 @@ class TGReDialSystem(BaseSystem):
                 print(f"[Recommend]:")
                 for item_id in item_ids:
                     if item_id in self.id2entity:
-                        print(self.id2entity[item_id])
+                        eprint(self.id2entity[item_id])
             # conv
             if hasattr(self, 'conv_model'):
                 conv_input = self.process_input(input_text, 'conv')

@@ -339,6 +339,8 @@ class TGReDialDataset(BaseDataset):
         last_role = None
         # print('conversation keys: ', conversation.keys()) # conv_id', 'messages', 'user_id' 
         for utt in conversation['messages']:
+            if utt['role'] == last_role:
+                print(utt)
             assert utt['role'] != last_role
             # change movies into slots
             if self.replace_token:

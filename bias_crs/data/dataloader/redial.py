@@ -9,10 +9,10 @@
 
 import re
 from copy import copy
-
+import os
 import torch
 from tqdm import tqdm
-
+from bias_crs.config import DATASET_PATH
 from bias_crs.data.dataloader.base import BaseDataLoader
 from bias_crs.data.dataloader.utils import padded_tensor, get_onehot, truncate
 
@@ -62,6 +62,8 @@ class ReDialDataLoader(BaseDataLoader):
         self.item_token_idx = vocab['vocab_size']
         self.conversation_truncate = self.opt.get('conversation_truncate', None)
         self.utterance_truncate = self.opt.get('utterance_truncate', None)
+        tokenize = opt['tokenize']
+        self.dpath = os.path.join(DATASET_PATH, "redial", tokenize['rec'])
 
     def rec_process_fn(self, *args, **kwargs):
         dataset = []

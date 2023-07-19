@@ -53,7 +53,8 @@ class ReDialSystem(BaseSystem):
         self.conv_epoch = self.conv_optim_opt['epoch']
         self.rec_batch_size = self.rec_optim_opt['batch_size']
         self.conv_batch_size = self.conv_optim_opt['batch_size']
-
+        self.rec_batch_mode = self.rec_optim_opt['batch_mode']
+        
         self.language = dataset_language_map[self.opt['dataset']]
         self.bias_data_dir = os.path.join(DATA_PATH, 'bias', 'redial', self.opt['dataset'])
         if not os.path.exists(self.bias_data_dir):
@@ -69,7 +70,7 @@ class ReDialSystem(BaseSystem):
             item = self.item_ids.index(item)
             self.evaluator.rec_evaluate(rec_rank, item)
 
-    def save_rec_bias_data(self, related_data, rec_predict):
+    def save_rec_bias_data(self, related_data, rec_predict, item):
         rec_predict = rec_predict.cpu()
         rec_predict = rec_predict[:, self.item_ids]
         _, rec_ranks = torch.topk(rec_predict, 50, dim=-1)
@@ -80,7 +81,8 @@ class ReDialSystem(BaseSystem):
         batch_data['context_tokens'] = batch_data['token_ids'].apply(lambda x: [self.ind2tok[idx] for idx_l in x for idx in idx_l])
         batch_data['context_words'] = batch_data['word_ids'].apply(lambda x: [self.id2word[idx] for idx in x])
         batch_data['context_entities'] = batch_data['entity_ids'].apply(lambda x: [self.id2entity[idx] for idx in x])
-
+        batch_data['target_item_index'] = item.detach().cpu().numpy()
+        
         if os.path.exists(os.path.join(self.bias_data_dir, 'bias_analytic_data.csv')):
             batch_data.to_csv(os.path.join(self.bias_data_dir, 'bias_analytic_data.csv'), mode='a', encoding='utf-8', header=False)
         else:
@@ -112,7 +114,7 @@ class ReDialSystem(BaseSystem):
             else:
                 self.rec_evaluate(rec_scores, batch['item'])
                 if mode == "test":
-                    self.save_rec_bias_data(related_data, rec_scores)
+                    self.save_rec_bias_data(related_data, rec_scores, batch['item'])
             rec_loss = rec_loss.item()
             self.evaluator.optim_metrics.add("rec_loss", AverageMetric(rec_loss))
         else:
@@ -132,7 +134,7 @@ class ReDialSystem(BaseSystem):
             self.evaluator.reset_metrics()
             logger.info(f'[Recommendation epoch {str(epoch)}]')
             logger.info('[Train]')
-            for batch in self.train_dataloader['rec'].get_rec_data(batch_size=self.rec_batch_size):
+            for batch in self.train_dataloader['rec'].get_rec_data(batch_size=self.rec_batch_size, batch_mode='popnudge'):
                 self.step(batch, stage='rec', mode='train')
             self.evaluator.report(epoch=epoch, mode='train')  # report train loss
             # val

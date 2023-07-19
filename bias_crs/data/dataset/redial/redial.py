@@ -229,12 +229,12 @@ class ReDialDataset(BaseDataset):
         
         for i, conv in enumerate(raw_conv_dict):
             text_tokens, entities, movies, words = conv["text"], conv["entity"], conv["movie"], conv["word"]
-            contexts = self.full_data[conv['conv_id']]['messages']
+            # contexts = self.full_data[conv['conv_id']]['messages']
             if len(context_tokens) > 0:
                 conv_dict = {
                     "role": conv['role'],
                     "conv_id": conv['conv_id'],
-                    "user_id": contexts[i]['senderWorkerId'],
+                    "user_id": self.full_data[conv['conv_id']]['messages'][i]['senderWorkerId'] if conv['conv_id'] in self.full_data else 'syn_user',
                     "context_tokens": copy(context_tokens),
                     "response": text_tokens,
                     "context_entities": copy(context_entities),

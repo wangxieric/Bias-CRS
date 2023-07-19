@@ -86,7 +86,7 @@ class UCCRSystem(BaseSystem):
         batch_data['context_tokens'] = batch_data['token_ids'].apply(lambda x: [self.ind2tok[idx] for idx_l in x for idx in idx_l])
         batch_data['context_words'] = batch_data['word_ids'].apply(lambda x: [self.id2word[idx] for idx in x])
         batch_data['context_entities'] = batch_data['entity_ids'].apply(lambda x: [self.id2entity[idx] for idx in x])
-        batch_data['target_item'] = item.detach().cpu().numpy()
+        batch_data['target_item_index'] = item.detach().cpu().numpy()
         
         if os.path.exists(os.path.join(self.bias_data_dir, 'bias_analytic_data.csv')):
             batch_data.to_csv(os.path.join(self.bias_data_dir, 'bias_analytic_data.csv'), mode='a', encoding='utf-8', header=False)
@@ -228,7 +228,7 @@ class UCCRSystem(BaseSystem):
             self.evaluator.reset_metrics()
             logger.info(f'[Recommendation epoch {str(epoch)}]')
             logger.info('[Train]')
-            for batch in self.train_dataloader.get_rec_data(self.rec_batch_size, shuffle=True):
+            for batch in self.train_dataloader.get_rec_data(self.rec_batch_size, batch_mode='popnudge', shuffle=True):
                 self.step(batch, stage='rec', mode='train')
             self.evaluator.report()
             # val

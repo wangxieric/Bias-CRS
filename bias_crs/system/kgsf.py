@@ -74,7 +74,7 @@ class KGSFSystem(BaseSystem):
             item = self.item_ids.index(item)
             self.evaluator.rec_evaluate(rec_rank, item)
 
-    def save_rec_bias_data(self, related_data, rec_predict):
+    def save_rec_bias_data(self, related_data, rec_predict, item):
         rec_predict = rec_predict.cpu()
         rec_predict = rec_predict[:, self.item_ids]
         _, rec_ranks = torch.topk(rec_predict, 50, dim=-1)
@@ -85,7 +85,8 @@ class KGSFSystem(BaseSystem):
         batch_data['context_tokens'] = batch_data['token_ids'].apply(lambda x: [self.ind2tok[idx] for idx_l in x for idx in idx_l])
         batch_data['context_words'] = batch_data['word_ids'].apply(lambda x: [self.id2word[idx] for idx in x])
         batch_data['context_entities'] = batch_data['entity_ids'].apply(lambda x: [self.id2entity[idx] for idx in x])
-
+        batch_data['target_item_index'] = item.detach().cpu().numpy()
+        
         if os.path.exists(os.path.join(self.bias_data_dir, 'bias_analytic_data.csv')):
             batch_data.to_csv(os.path.join(self.bias_data_dir, 'bias_analytic_data.csv'), mode='a', encoding='utf-8', header=False)
         else:
@@ -117,7 +118,7 @@ class KGSFSystem(BaseSystem):
                 self.backward(loss.sum())
             else:
                 if mode == "test":
-                    self.save_rec_bias_data(related_data, rec_predict)
+                    self.save_rec_bias_data(related_data, rec_predict, batch[-2])
                 self.rec_evaluate(rec_predict, batch[-2])
             rec_loss = rec_loss.sum().item()
             self.evaluator.optim_metrics.add("rec_loss", AverageMetric(rec_loss))
@@ -157,7 +158,8 @@ class KGSFSystem(BaseSystem):
             self.evaluator.reset_metrics()
             logger.info(f'[Recommendation epoch {str(epoch)}]')
             logger.info('[Train]')
-            for batch in self.train_dataloader.get_rec_data(self.rec_batch_size, shuffle=False):
+            for batch in self.train_dataloader.get_rec_data(self.rec_batch_size, batch_mode='popnudge', shuffle=False):
+                # print("batch: ", batch)
                 self.step(batch, stage='rec', mode='train')
             self.evaluator.report(epoch=epoch, mode='train')
             # val
