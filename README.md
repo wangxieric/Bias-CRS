@@ -1,7 +1,10 @@
-This repository includes the implementations and the access to the resources within the paper "Improving Conversational Recommendation Systems via Bias Analysis and
-Language-Model-Enhanced Data Augmentation", accepted by EMNLP 2023 (Findings). 
+# Improving Conversational Recommendation Systems via Bias Analysis and Language-Model-Enhanced Data Augmentation
+<div align="center">
+Accepted by EMNLP 2023 (Findings)
 
-The experiments were conducted over ReDial, KGSF, KBRD and TGReDial datasets.
+  [![made-with-pytorch](https://img.shields.io/badge/Made%20with-PyTorch-brightgreen)](https://pytorch.org/)
+  [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT) 
+</div>
 
 ## Commands to prepare the enviroment
 
@@ -35,8 +38,7 @@ apt-get install python3.x-dev
 ```
 python run_bias_crs.py --config config/crs/tgredial/tgredial.yaml
 ```
-
-The evaluations were conducted over ReDIAL and TGReDIAL datasets.
+The experiments were conducted over ReDial, KGSF, KBRD and TGReDial models and evaluated on ReDIAL and TGReDIAL datasets.
 
 ## Data Augmentation
 The generation and preparation of the synthetic dialogues is implmented by first [data_prep_gen_*.ipynb] and then [gen_convert_*.ipynb] within the folder of data_aug (* refers to the name of datasets).
