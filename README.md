@@ -1,27 +1,13 @@
-# Bias-CRS
+This repository includes the implementations and the access to the resources within the paper "Improving Conversational Recommendation Systems via Bias Analysis and
+Language-Model-Enhanced Data Augmentation", accepted by EMNLP 2023 (Findings). 
 
-**Bias-CRS** is a framework that analyses the effects of various widely discussed biases from _statis recommendation_ to **conversational recommendation models**. 
-
-In this framework, we explore multiple recent conversational recommenders:
-
-| Model name | Publication Venue | Code Access| Implementation Status|
-| ----------- |  ----------- | ----------- | ----------- |
-|_ReDial_ | [NeurIPS'18](https://proceedings.neurips.cc/paper/2018/hash/800de15c79c8d840f4e78d3af937d4d4-Abstract.html) | [github link](https://github.com/RaymondLi0/conversational-recommendations)| :heavy_check_mark:|
-|_KBRD_| [EMNLP-IJCNLP'19](https://aclanthology.org/D19-1189.pdf) | [github link](https://github.com/THUDM/KBRD)|:heavy_check_mark:|
-|_TG-ReDial_| [COLING'20](https://arxiv.org/pdf/2010.04125.pdf) | [github link](https://github.com/RUCAIBox/TG-ReDial)|:heavy_check_mark:|
-|_KGSF_|[KDD'20](https://dl.acm.org/doi/pdf/10.1145/3394486.3403143?casa_token=qTqGjTCTaCsAAAAA:FdszxYP9t9NH8ZyB2QUYl2ipEwx6ZHbJCgsbOTn18B2ziDgUB7KCO-av64pNjpNWbR0lZjyi4TSQSQ)| [github link](https://github.com/Lancelot39/KGSF)|:heavy_check_mark:|
-|_RevCore_| [ACL Findings'21](https://aclanthology.org/2021.findings-acl.99.pdf) | [github link](https://github.com/JD-AI-Research-NLP/RevCore)|:heavy_check_mark:|
-|_MESE_| [NAACL Findings'22](https://aclanthology.org/2022.findings-naacl.4.pdf)| [github link](https://github.com/by2299/MESE)||
-|_C<sup>2</sup>-CRS_|[WSDM'22](https://dl.acm.org/doi/pdf/10.1145/3488560.3498514)| [github link](https://github.com/Zyh716/WSDM2022-C2CRS)||
-|_UniCRS_|[KDD'22](https://dl.acm.org/doi/pdf/10.1145/3534678.3539382)| [github link](https://github.com/RUCAIBox/UniCRS)||
-|_UCCR_| [SIGIR'22](https://dl.acm.org/doi/pdf/10.1145/3477495.3532074)| [github link](https://github.com/lisk123/UCCR)|:heavy_check_mark:|
+The experiments were conducted over ReDial, KGSF, KBRD and TGReDial datasets.
 
 ## Commands to prepare the enviroment
 
 ```
 apt-get update
 apt-get install build-essential -y
-
 
 Preparing enviroment:
 (for torch 1.12.0)
@@ -49,11 +35,29 @@ apt-get install python3.x-dev
 ```
 python run_bias_crs.py --config config/crs/tgredial/tgredial.yaml
 ```
-## Recommendation Results
 
-### TG-ReDial Dataset
+The evaluations were conducted over ReDIAL and TGReDIAL datasets.
 
-| Model name | Recall@1 | Recall@10| Recall@50| MRR@1 | MRR@10 | MRR@50| NDCG@1| NDCG@10 | NDCG@50|
-| ----------- |  ----------- | ----------- | ----------- |  ----------- |  ----------- |  ----------- |  ----------- |  ----------- |  ----------- |
-|_ReDial_| 0.0| 0.0| 0.04348 | 0.0| 0.0 | 0.0009 | 0.0 | 0.0 | 0.0077|   
-|_KBRD_|0.0049|0.0281|0.0651| 0.004902 | 0.01093 | 0.01241 | 0.004902 | 0.01494 | 0.02271 |
+## Data Augmentation
+The generation and preparation of the synthetic dialogues is implmented by first [data_prep_gen_*.ipynb] and then [gen_convert_*.ipynb] within the folder of data_aug (* refers to the name of datasets).
+
+The data augmentation is implemented within the base.py within [bias_crs/data/dataloader/base.py], while the changes to the number of items to be augmented via popNudge can be changed from [here](https://github.com/wangxieric/Bias-CRS/blob/4bffa32179999a3645eba16874cc5d60b3b04e99/bias_crs/data/dataloader/base.py#L336C1-L336C81).
+
+For every run of the experimental results will be saved under the directory of [data/bias/] and followed by the folders named after model and dataset names and entitled [bias_anlytic_data.csv].
+
+The corresponding analysis of the recommendation results via Cross-Episode Popularity and User Intent-Oriented Popularity scores can be accessed via the folder of [analysis].
+
+
+## Citation
+```
+@inproceedings{
+    title={Improving Conversational Recommendation Systems via Bias Analysis and Language-Model-Enhanced Data Augmentation},
+    author={Xi Wang, Hossein A. Rahmani, Jiqun Liu, Emine Yilmaz}
+    booktitle={Proceedings of EMNLP 2023 (Findings)}
+    year={2023}
+}
+```
+
+## Acknowledgement
+
+This repository is developed based on the CRSLab framework [https://github.com/RUCAIBox/CRSLab]. Thanks to their invaluable contributions for enabling a systematic development and evaluation of models within this project. 
