@@ -49,6 +49,37 @@ For every run of the experimental results will be saved under the directory of [
 
 The corresponding analysis of the recommendation results via Cross-Episode Popularity and User Intent-Oriented Popularity scores can be accessed via the folder of [analysis].
 
+### Calculate Cross-Episode Popularity
+```
+from scipy.stats.stats import pearsonr
+
+def compute_pop_scores(pop_score_dict, items):
+    return [pop_score_dict[item] if item in pop_score_dict else 0.0 for item in items]
+
+pop_scores = [compute_pop_scores(pop_score_dict, row['Prediction_items']) for _, row in data.iterrows()]
+data['pop_scores'] = pop_scores
+
+new_conv = True
+cep_scores = []
+for idx, row in data.iterrows():
+    # set the default value to the first episode
+    if new_conv:
+        new_conv = False
+        cep_scores.append(0.5)
+    else:
+        if idx+1 < len(data) and row['conv_id'] != data.at[idx+1, 'conv_id']:
+            new_conv=True
+        pearsonr_score = np.abs(pearsonr(row['pop_scores'], data.at[idx-1, 'pop_scores'])[0])
+        cep_scores.append(pearsonr_score)
+
+data['cep_score'] = cep_scores
+data['cep_pop_score'] = data['cep_score'] * data['pop_bias']
+```
+### Calculate User intent-Oriented Popularity
+```
+data['target_pop_score'] = data['target_item_index'].map(pop_score_dict)
+data['UIOP'] = np.abs(data['pop_bias'] - data['target_pop_score'])
+```
 
 ## Citation
 ```
